@@ -218,21 +218,46 @@ function LimePanel({tx}) {
   );
 }
 
+// ── FIXED LLMPanel ────────────────────────────────────────────────────────────
 function LLMPanel({tx, score}) {
-  const [text,setText]=useState(""); const [loading,setLoading]=useState(false);
-  const [error,setError]=useState(""); const [done,setDone]=useState(false);
+  const [text, setText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
+
   const run = async () => {
     setLoading(true); setError(""); setText(""); setDone(false);
     const r = riskLevel(score);
     const prompt = `You are an AI assistant in a bank fraud detection dashboard for anti-fraud analysts.\n\nTransaction: ${tx.id} · €${tx.amount} at ${tx.merchant} (${tx.category}, ${tx.country}) · ${tx.time} · Card ${tx.cardPresent?"present":"not present"} · ${tx.intl?"International":"Domestic"} · ${tx.distanceKm}km · ${tx.velocity} txns/hr · ${tx.newMerchant?"New":"Known"} merchant · Avg spend €${tx.avgSpend}\nXGBoost score: ${Math.round(score*100)}/100 (${r.text})\n\nWrite 3 concise paragraphs: (1) overall risk and key drivers, (2) what the model detected and why, (3) recommended action. Plain language, no bullets.`;
+
     try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
       const data = await res.json();
-      console.log("Response:", JSON.stringify(data));
-      setText(data.content?.filter(b=>b.type==="text").map(b=>b.text).join("")||"No response.");
-      setDone(true);
-    } catch { setError("API call failed."); }
+      if (data.error) {
+        setError(`API error: ${data.error.message}`);
+      } else {
+        setText(data.content?.filter(b => b.type === "text").map(b => b.text).join("") || "No response.");
+        setDone(true);
+      }
+    } catch (e) {
+      setError("API call failed. Check your API key in Vercel environment variables.");
+    }
     setLoading(false);
   };
+
   return (
     <div>
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
@@ -242,7 +267,7 @@ function LLMPanel({tx, score}) {
       </div>
       {!done&&!loading&&<button onClick={run} style={{padding:"8px 18px",borderRadius:8,border:"1px solid #6b3fa0",background:"#f9f4ff",color:"#6b3fa0",fontSize:13,cursor:"pointer",fontWeight:500}}>Generate narrative ↗</button>}
       {loading&&<div style={{display:"flex",alignItems:"center",gap:8,color:"#888",fontSize:13}}><div style={{width:13,height:13,border:"2px solid #ccc",borderTopColor:"#6b3fa0",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>Generating…</div>}
-      {error&&<div style={{color:"#c0392b",fontSize:13}}>{error}</div>}
+      {error&&<div style={{color:"#c0392b",fontSize:13,padding:"8px 12px",background:"#fdecea",borderRadius:6}}>{error}</div>}
       {text&&<div><div style={{fontSize:13,lineHeight:1.8,color:"#333",whiteSpace:"pre-wrap"}}>{text}</div><button onClick={run} style={{marginTop:8,padding:"4px 12px",borderRadius:6,border:"1px solid #ddd",background:"#fafafa",color:"#888",fontSize:12,cursor:"pointer"}}>Regenerate</button></div>}
     </div>
   );
@@ -794,8 +819,6 @@ export default function App() {
               <EvalWidget step={step} expTab={expTab} saved={saved} onSave={(k,d)=>setSaved(s=>({...s,[k]:d}))}/>
             </div>
           )}
-
-
         </div>
       </div>
     </div>
