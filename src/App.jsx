@@ -42,22 +42,9 @@ const REAL_EXPLANATIONS = {
   "3453553": { score:0.8175, shap:{TransactionAmt:0.171,ProductCD:1.0238,card4:-0.2542,card6:0.346,addr1:-0.0704,dist1:0.3}, lime:{"card6 <= 1.00":-0.1426,"TransactionAmt > 125.00":0.1348,"ProductCD <= 3.00":0.1179,"dist1 <= -1.00":0.0673,"addr1 <= 184.00":-0.0532,"card4 <= 2.00":-0.0052} },
 };
 
-// XGBoost-style score based on available real features
 function xgbScore(tx) {
   if (!tx) return 0;
-  let s = 0.05;
-  if (tx.amount > 500) s += 0.25;
-  else if (tx.amount > 200) s += 0.12;
-  else if (tx.amount > 100) s += 0.06;
-  if (tx.cardType === "credit") s += 0.08;
-  if (tx.dist !== null && tx.dist > 500) s += 0.15;
-  else if (tx.dist !== null && tx.dist > 100) s += 0.07;
-  if (tx.dist === null) s += 0.05; // missing distance is a weak signal
-  if (tx.addr === null) s += 0.10; // missing address is a stronger signal
-  if (tx.product === "C") s += 0.08; // card-not-present type
-  if (tx.network === "visa" && tx.cardType === "credit") s += 0.04;
-
-  return Math.min(0.99, s);
+  return REAL_EXPLANATIONS[tx.id]?.score ?? 0;
 }
 
 function lrScore(tx) {
