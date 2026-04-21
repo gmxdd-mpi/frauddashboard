@@ -107,7 +107,6 @@ const TASK_METRICS = {
     {lbl:"Confidence", type:"l7"},
   ],
   escalate: [
-    {lbl:"How long did you take to understand this explanation?", type:"speed_exp"},
     {lbl:"On a scale of 1 to 5, how clear was this explanation?", type:"clarity"},
     {lbl:"On a scale of 1 to 5, how complete was this explanation?", type:"completeness"},
   ],
@@ -495,10 +494,9 @@ function MetricInput({m, val, onChange}) {
   }
 }
 
-function EscalateEvalWidget({expTab, saved, onSave}) {
+function EscalateEvalWidget({expTab, expTabStartTime, saved, onSave}) {
   const [open, setOpen] = useState(false);
   const [vals, setVals] = useState({});
-  const [startTime] = useState(Date.now());
   const key = `escalate-${expTab}`;
   const metrics = TASK_METRICS.escalate;
 
@@ -675,6 +673,12 @@ export default function App() {
   const [selected,setSelected]=useState(0);
   const [step,setStep]=useState("triage");
   const [expTab,setExpTab]=useState("shap");
+  const [expTabStartTime,setExpTabStartTime]=useState(Date.now());
+
+  const handleExpTabChange = (tabId) => {
+    setExpTab(tabId);
+    setExpTabStartTime(Date.now());
+  };
   const [saved,setSaved]=useState({});
   const [userRanking,setUserRanking]=useState([]);
   const [showMeta,setShowMeta]=useState(false);
@@ -844,7 +848,7 @@ export default function App() {
                       <span style={{fontSize:10,fontWeight:500,color:g.col,minWidth:180,flexShrink:0}}>{g.label}</span>
                       <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
                         {g.tabs.map(t=>(
-                          <button key={t.id} onClick={()=>setExpTab(t.id)}
+                          <button key={t.id} onClick={()=>handleExpTabChange(t.id)}
                             style={{padding:"4px 10px",fontSize:11,border:`1px solid ${expTab===t.id?g.col:"#e0e0e0"}`,borderRadius:16,background:expTab===t.id?g.bg:"#fff",color:expTab===t.id?g.col:"#888",cursor:"pointer",fontWeight:expTab===t.id?500:400}}>
                             {t.label}
                           </button>
@@ -863,7 +867,7 @@ export default function App() {
                   {expTab==="dtree"          && <DTreePanel tx={tx}/>}
                   {expTab==="peers"          && <PeersPanel tx={tx}/>}
                 </div>
-                <EscalateEvalWidget expTab={ALL_EXP_TABS.find(t=>t.toLowerCase().replace(/ /g,"")===expTab)||expTab} saved={saved} onSave={(k,d)=>setSaved(s=>({...s,[k]:d}))}/>
+                <EscalateEvalWidget expTab={ALL_EXP_TABS.find(t=>t.toLowerCase().replace(/ /g,"")===expTab)||expTab} expTabStartTime={expTabStartTime} saved={saved} onSave={(k,d)=>setSaved(s=>({...s,[k]:d}))}/>
               </div>
             )}
           </div>
