@@ -857,7 +857,7 @@ export default function App() {
                 <div style={{borderTop:"1px solid #f0f0f0",paddingTop:14,marginTop:4}}>
                   {expTab==="shap"           && <ShapPanel tx={tx}/>}
                   {expTab==="lime"           && <LimePanel tx={tx}/>}
-                  {expTab==="llm"            && <LLMPanel tx={tx} score={score}/>}
+                  {expTab==="llm"            && <LLMPanel key={tx.id} tx={tx} score={score}/>}
                   {expTab==="counterfactual" && <CounterfactualPanel tx={tx} score={score}/>}
                   {expTab==="logreg"         && <LogRegPanel tx={tx}/>}
                   {expTab==="dtree"          && <DTreePanel tx={tx}/>}
