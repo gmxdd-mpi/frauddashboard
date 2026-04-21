@@ -219,20 +219,6 @@ function ShapPanel({tx}) {
   );
 }
 
-function getLime(tx) {
-  if (!tx) return [];
-  // LIME uses a local linear surrogate — different feature weights and ordering than SHAP
-  // It also tends to miss some features and overweight others due to sampling noise
-  return [
-    { f:"Product code",       v: tx.product==="C"?0.22:0.01,                          lbl:`${tx.product} · ${PRODUCT_LABELS[tx.product]||tx.product}` },
-    { f:"Address (addr1)",    v: tx.addr===null?0.17:-0.06,                            lbl:tx.addr!==null?`${tx.addr}`:"N/A" },
-    { f:"Transaction amount", v: tx.amount>200?0.09:tx.amount>100?0.04:-0.05,         lbl:`${tx.amount}` },
-    { f:"Card type",          v: tx.cardType==="credit"?0.06:-0.02,                   lbl:tx.cardType },
-    // LIME sometimes misses distance or gives it low weight
-    { f:"Distance (dist1)",   v: tx.dist===null?0.03:tx.dist>200?0.05:tx.dist<20?-0.08:-0.01, lbl:tx.dist!==null?`${tx.dist}km`:"N/A" },
-  ].sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));
-}
-
 function LimePanel({tx}) {
   const vals = getLime(tx);
   return (
