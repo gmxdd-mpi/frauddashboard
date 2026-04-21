@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 // Real transactions from IEEE-CIS Fraud Detection dataset (Kaggle, 2019)
-// Fields: TransactionID, TransactionAmt, ProductCD, card4 (network), card6 (type), addr1, dist1, isFraud
+// groundTruth is taken directly from isFraud column in the dataset
 const ALL_TXN = [
   { id:"3519372", amount:104.89, product:"C", network:"visa",       cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" },
   { id:"3053108", amount:152.51, product:"C", network:"visa",       cardType:"credit", addr:null, dist:null, groundTruth:"confirmed_fraud" },
@@ -20,10 +20,9 @@ const ALL_TXN = [
   { id:"3453553", amount:59.00,  product:"W", network:"visa",       cardType:"debit",  addr:204,  dist:6,    groundTruth:"legitimate"      },
 ];
 
-// ProductCD descriptions from IEEE-CIS documentation
 const PRODUCT_LABELS = { W:"Web purchase", C:"Card payment", H:"Home purchase", R:"Retail", S:"Service" };
 
-// Real SHAP and LIME values from trained XGBoost model (scale_pos_weight=27.6) on IEEE-CIS dataset
+// Real SHAP and LIME values + XGBoost scores from trained model (scale_pos_weight=27.6) on IEEE-CIS dataset
 const REAL_EXPLANATIONS = {
   "3519372": { score:0.0754, shap:{TransactionAmt:-2.3667,ProductCD:-0.0615,card4:0.7712,card6:0.0789,addr1:-0.4372,dist1:-0.4749}, lime:{"card6 <= 1.00":-0.1407,"TransactionAmt <= 43.32":-0.1163,"ProductCD <= 3.00":0.1095,"card4 <= 2.00":-0.0222,"-1.00 < dist1 <= 5.00":0.015,"addr1 > 327.00":0.0038} },
   "3053108": { score:0.0096, shap:{TransactionAmt:-0.4179,ProductCD:0.3726,card4:-0.3341,card6:-2.195,addr1:-0.5997,dist1:-1.4414}, lime:{"card6 <= 1.00":-0.1449,"ProductCD <= 3.00":0.1068,"dist1 > 5.00":-0.0815,"184.00 < addr1 <= 272.00":0.0237,"card4 <= 2.00":-0.0144,"68.77 < TransactionAmt <= 125.00":0.001} },
@@ -42,38 +41,17 @@ const REAL_EXPLANATIONS = {
   "3453553": { score:0.8175, shap:{TransactionAmt:0.171,ProductCD:1.0238,card4:-0.2542,card6:0.346,addr1:-0.0704,dist1:0.3}, lime:{"card6 <= 1.00":-0.1426,"TransactionAmt > 125.00":0.1348,"ProductCD <= 3.00":0.1179,"dist1 <= -1.00":0.0673,"addr1 <= 184.00":-0.0532,"card4 <= 2.00":-0.0052} },
 };
 
+// Single scoring function — real XGBoost model output
 function xgbScore(tx) {
   if (!tx) return 0;
   return REAL_EXPLANATIONS[tx.id]?.score ?? 0;
-}
-
-function lrScore(tx) {
-  if (!tx) return 0;
-  const logit = -1.5
-    + (tx.amount > 200 ? 0.9 : tx.amount > 100 ? 0.4 : 0.1)
-    + (tx.cardType === "credit" ? 0.5 : 0)
-    + (tx.dist !== null ? (tx.dist / 1000) * 0.8 : 0.3)
-    + (tx.addr === null ? 0.7 : 0)
-    + (tx.product === "C" ? 0.6 : 0);
-  return Math.min(0.99, Math.max(0.01, 1 / (1 + Math.exp(-logit))));
-}
-
-function dtScore(tx) {
-  if (!tx) return 0;
-  if (tx.amount > 500 && tx.cardType === "credit") return 0.91;
-  if (tx.addr === null && tx.product === "C") return 0.85;
-  if (tx.dist !== null && tx.dist > 500) return 0.80;
-  if (tx.amount > 200 && tx.addr === null) return 0.74;
-  if (tx.amount < 100 && tx.addr !== null && tx.dist !== null && tx.dist < 50) return 0.09;
-  if (tx.amount < 100 && tx.cardType === "debit") return 0.18;
-  return 0.30;
 }
 
 function getShap(tx) {
   if (!tx) return [];
   const shap = REAL_EXPLANATIONS[tx.id]?.shap ?? {};
   const labels = {
-    TransactionAmt: `${tx.amount}`,
+    TransactionAmt: `$${tx.amount}`,
     ProductCD: `${tx.product} · ${PRODUCT_LABELS[tx.product]||tx.product}`,
     card4: tx.network,
     card6: tx.cardType,
@@ -172,8 +150,8 @@ function Gauge({score}) {
   );
 }
 
-function AttrBar({v}) {
-  const pct = Math.min(Math.abs(v)/0.30*100,100);
+function AttrBar({v, maxV=2.5}) {
+  const pct = Math.min(Math.abs(v)/maxV*100, 100);
   return (
     <div style={{flex:1,background:"#f5f5f5",borderRadius:3,height:11,position:"relative",overflow:"hidden"}}>
       <div style={{position:"absolute",left:v>0?"50%":`${50-pct/2}%`,width:`${pct/2}%`,height:"100%",background:v>0?"#c0392b":"#1a7a4a"}}/>
@@ -184,6 +162,7 @@ function AttrBar({v}) {
 
 function ShapPanel({tx}) {
   const vals = getShap(tx);
+  const maxV = Math.max(...vals.map(d=>Math.abs(d.v)), 0.01);
   return (
     <div>
       <div style={{fontSize:12,color:"#888",marginBottom:8}}>Per-feature contribution to XGBoost score (TreeSHAP — exact)</div>
@@ -197,8 +176,8 @@ function ShapPanel({tx}) {
             <span style={{color:"#444"}}>{d.f}</span><span style={{color:"#aaa"}}>{d.lbl}</span>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:6}}>
-            <AttrBar v={d.v}/>
-            <span style={{fontSize:11,color:d.v>0?"#c0392b":"#1a7a4a",minWidth:44,textAlign:"right"}}>{d.v>0?"+":""}{d.v.toFixed(3)}</span>
+            <AttrBar v={d.v} maxV={maxV}/>
+            <span style={{fontSize:11,color:d.v>0?"#c0392b":"#1a7a4a",minWidth:52,textAlign:"right"}}>{d.v>0?"+":""}{d.v.toFixed(3)}</span>
           </div>
         </div>
       ))}
@@ -208,6 +187,7 @@ function ShapPanel({tx}) {
 
 function LimePanel({tx}) {
   const vals = getLime(tx);
+  const maxV = Math.max(...vals.map(d=>Math.abs(d.v)), 0.01);
   return (
     <div>
       <div style={{fontSize:12,color:"#888",marginBottom:8}}>Local linear surrogate fitted around this transaction (sampled neighbourhood)</div>
@@ -217,12 +197,10 @@ function LimePanel({tx}) {
       </div>
       {vals.map((d,i)=>(
         <div key={i} style={{marginBottom:8}}>
-          <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:2}}>
-            <span style={{color:"#444"}}>{d.f}</span><span style={{color:"#aaa"}}>{d.lbl}</span>
-          </div>
+          <div style={{fontSize:11,color:"#444",marginBottom:2}}>{d.f}</div>
           <div style={{display:"flex",alignItems:"center",gap:6}}>
-            <AttrBar v={d.v}/>
-            <span style={{fontSize:11,color:d.v>0?"#c0392b":"#1a7a4a",minWidth:44,textAlign:"right"}}>{d.v>0?"+":""}{d.v.toFixed(3)}</span>
+            <AttrBar v={d.v} maxV={maxV}/>
+            <span style={{fontSize:11,color:d.v>0?"#c0392b":"#1a7a4a",minWidth:52,textAlign:"right"}}>{d.v>0?"+":""}{d.v.toFixed(3)}</span>
           </div>
         </div>
       ))}
@@ -311,29 +289,25 @@ function CounterfactualPanel({tx, score}) {
 }
 
 function LogRegPanel({tx}) {
-  const score = lrScore(tx); const r = riskLevel(score);
-  const coeffs = [
-    {f:"Intercept",        coef:-1.50, val:1,                              c:-1.50},
-    {f:"Amount",           coef:0.90,  val:tx.amount>200?1:tx.amount>100?0.5:0.1, c:tx.amount>200?0.90:tx.amount>100?0.45:0.09},
-    {f:"Credit card",      coef:0.50,  val:tx.cardType==="credit"?1:0,     c:tx.cardType==="credit"?0.50:0},
-    {f:"Distance",         coef:0.80,  val:tx.dist!==null?tx.dist/1000:0.3,c:tx.dist!==null?(tx.dist/1000)*0.8:0.24},
-    {f:"Missing address",  coef:0.70,  val:tx.addr===null?1:0,             c:tx.addr===null?0.70:0},
-    {f:"Product C",        coef:0.60,  val:tx.product==="C"?1:0,           c:tx.product==="C"?0.60:0},
-  ].sort((a,b)=>Math.abs(b.c)-Math.abs(a.c));
+  const score = xgbScore(tx); const r = riskLevel(score);
+  const shap = REAL_EXPLANATIONS[tx.id]?.shap ?? {};
+  const coeffs = Object.entries(shap)
+    .map(([f,v]) => ({f, v}))
+    .sort((a,b) => Math.abs(b.v)-Math.abs(a.v));
   return (
     <div>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-        <Badge label="Logistic Regression" col="#16a085" bg="#e8f8f5"/>
+        <Badge label="Logistic Regression (approx.)" col="#16a085" bg="#e8f8f5"/>
         <span style={{fontSize:12,color:"#888"}}>Score: <strong style={{color:r.col}}>{Math.round(score*100)}/100</strong></span>
       </div>
+      <div style={{fontSize:11,color:"#aaa",marginBottom:10,fontStyle:"italic"}}>Log-odds contributions from XGBoost feature values, presented as a linear approximation</div>
       <div style={{fontFamily:"monospace",fontSize:11,background:"#f8f8f8",borderRadius:6,padding:"9px 12px",marginBottom:12,lineHeight:1.7,color:"#555"}}>
-        P(fraud) = σ({coeffs.map((c,i)=>`${i>0&&c.c>0?"+":""}${c.c.toFixed(2)}`).join(" ")})
+        P(fraud) = σ({coeffs.map((c,i)=>`${i>0&&c.v>0?"+":""}${c.v.toFixed(3)}`).join(" ")}) = {Math.round(score*100)}%
       </div>
       {coeffs.map((c,i)=>(
         <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:"1px solid #f5f5f5"}}>
           <span style={{flex:1,fontSize:12,color:"#444"}}>{c.f}</span>
-          <span style={{fontSize:11,color:"#aaa",minWidth:90}}>{c.coef.toFixed(2)} × {c.val.toFixed(2)}</span>
-          <span style={{fontSize:12,fontWeight:500,minWidth:50,textAlign:"right",color:c.c>0?"#c0392b":"#1a7a4a"}}>{c.c>0?"+":""}{c.c.toFixed(2)}</span>
+          <span style={{fontSize:12,fontWeight:500,minWidth:50,textAlign:"right",color:c.v>0?"#c0392b":"#1a7a4a"}}>{c.v>0?"+":""}{c.v.toFixed(3)}</span>
         </div>
       ))}
     </div>
@@ -341,26 +315,31 @@ function LogRegPanel({tx}) {
 }
 
 function DTreePanel({tx}) {
-  const score = dtScore(tx); const r = riskLevel(score);
-  const path = [];
-  if (tx.amount>500 && tx.cardType==="credit")          {path.push({q:"Amount > $500?",a:"Yes"},{q:"Credit card?",a:"Yes"});}
-  else if (tx.addr===null && tx.product==="C")           {path.push({q:"Address missing?",a:"Yes"},{q:"Product C (card payment)?",a:"Yes"});}
-  else if (tx.dist!==null && tx.dist>500)                {path.push({q:"Distance > 500km?",a:"Yes"});}
-  else if (tx.amount>200 && tx.addr===null)              {path.push({q:"Amount > $200?",a:"Yes"},{q:"Address missing?",a:"Yes"});}
-  else if (tx.amount<100 && tx.addr!==null && (tx.dist===null||tx.dist<50)) {path.push({q:"Amount < $100?",a:"Yes"},{q:"Address present & low distance?",a:"Yes"});}
-  else                                                   {path.push({q:"Amount < $100?",a:tx.amount<100?"Yes":"No"},{q:"Debit card?",a:tx.cardType==="debit"?"Yes":"No"});}
+  const score = xgbScore(tx); const r = riskLevel(score);
+  const shap = REAL_EXPLANATIONS[tx.id]?.shap ?? {};
+  const topFeatures = Object.entries(shap)
+    .sort((a,b) => Math.abs(b[1])-Math.abs(a[1]))
+    .slice(0,3);
+  const featureLabels = {
+    TransactionAmt: tx.amount > 125 ? `Amount > $125 ($${tx.amount})` : tx.amount > 43 ? `$43 < Amount ≤ $125 ($${tx.amount})` : `Amount ≤ $43 ($${tx.amount})`,
+    ProductCD: `Product = ${tx.product} (${PRODUCT_LABELS[tx.product]||tx.product})`,
+    card4: `Card network = ${tx.network}`,
+    card6: `Card type = ${tx.cardType}`,
+    addr1: tx.addr !== null ? `Address present (${tx.addr})` : "Address missing",
+    dist1: tx.dist !== null ? (tx.dist <= 5 ? `Distance ≤ 5km (${tx.dist}km)` : `Distance > 5km (${tx.dist}km)`) : "Distance unknown",
+  };
   return (
     <div>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-        <Badge label="Decision Tree" col="#16a085" bg="#e8f8f5"/>
+        <Badge label="Decision Tree (approx.)" col="#16a085" bg="#e8f8f5"/>
         <span style={{fontSize:12,color:"#888"}}>Score: <strong style={{color:r.col}}>{Math.round(score*100)}/100</strong></span>
       </div>
-      <div style={{fontSize:12,color:"#888",marginBottom:10}}>Decision path — transparent by construction</div>
-      {path.map((p,i)=>(
+      <div style={{fontSize:11,color:"#aaa",marginBottom:10,fontStyle:"italic"}}>Decision path derived from top XGBoost feature contributions</div>
+      {topFeatures.map(([f,v],i)=>(
         <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",marginBottom:6,background:i%2===0?"#f9f9f9":"#fff",borderRadius:6,border:"1px solid #f0f0f0"}}>
           <span style={{fontSize:14,color:"#aaa"}}>{"→".repeat(i+1)}</span>
-          <span style={{fontSize:12,color:"#555",flex:1}}><strong>IF</strong> {p.q}</span>
-          <Badge label={p.a} col={p.a==="Yes"?"#c0392b":"#1a7a4a"} bg={p.a==="Yes"?"#fdecea":"#e8f7ee"}/>
+          <span style={{fontSize:12,color:"#555",flex:1}}><strong>IF</strong> {featureLabels[f]||f}</span>
+          <Badge label={v>0?"↑ Risk":"↓ Risk"} col={v>0?"#c0392b":"#1a7a4a"} bg={v>0?"#fdecea":"#e8f7ee"}/>
         </div>
       ))}
       <div style={{marginTop:8,padding:"10px 12px",borderRadius:8,background:r.bg,color:r.col,fontSize:13,fontWeight:500}}>
@@ -408,7 +387,6 @@ function PeersPanel({tx}) {
   );
 }
 
-// ── Metric input ──────────────────────────────────────────────────────────────
 function MetricInput({m, val, onChange}) {
   switch (m.type) {
     case "classification":
@@ -478,7 +456,6 @@ function MetricInput({m, val, onChange}) {
   }
 }
 
-// ── Collapsible Eval Widget for Task 2 ───────────────────────────────────────
 function EscalateEvalWidget({expTab, saved, onSave}) {
   const [open, setOpen] = useState(false);
   const [vals, setVals] = useState({});
@@ -521,7 +498,6 @@ function EscalateEvalWidget({expTab, saved, onSave}) {
   );
 }
 
-// ── Standard Eval Widget (Task 1 & 3) ────────────────────────────────────────
 function EvalWidget({step, expTab, saved, onSave}) {
   const task = WORKFLOW.find(w=>w.id===step)||WORKFLOW[0];
   const metrics = TASK_METRICS[step]||[];
@@ -559,7 +535,6 @@ function EvalWidget({step, expTab, saved, onSave}) {
   );
 }
 
-// ── Priority panel ────────────────────────────────────────────────────────────
 function PriorityPanel({txns, selected, onSelect, userRanking, setUserRanking}) {
   const [dragIdx,setDragIdx]=useState(null);
   const [dragOver,setDragOver]=useState(null);
@@ -657,7 +632,6 @@ function SingleNav({txns, selected, onSelect}) {
   );
 }
 
-// ── Main app ──────────────────────────────────────────────────────────────────
 export default function App() {
   const [selected,setSelected]=useState(0);
   const [step,setStep]=useState("triage");
@@ -699,7 +673,6 @@ export default function App() {
     <div style={{fontFamily:"system-ui,sans-serif",padding:"1rem 0",maxWidth:1200}}>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
 
-      {/* Header */}
       <div style={{marginBottom:12}}>
         <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
           <div style={{fontSize:20,fontWeight:600}}>Fraud Dashboard with Explainable AI</div>
@@ -707,7 +680,7 @@ export default function App() {
           {showMeta && (
             <div style={{display:"flex",gap:6,alignItems:"center"}}>
               <Badge label="IEEE-CIS Fraud Detection dataset" col="#2980b9" bg="#e8f0fe"/>
-              <Badge label="XGBoost scoring" col="#888" bg="#f0f0f0"/>
+              <Badge label="XGBoost · scale_pos_weight=27.6" col="#888" bg="#f0f0f0"/>
               <Badge label="llama-3.3-70b-versatile · Groq" col="#e65c00" bg="#fff3e0"/>
             </div>
           )}
@@ -719,7 +692,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* Legend */}
       <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
         {Object.entries(TRUTH_CFG).map(([k,v])=>(
           <div key={k} style={{display:"flex",alignItems:"center",gap:5,padding:"4px 10px",borderRadius:8,background:v.bg,border:`1px solid ${v.col}30`}}>
@@ -729,7 +701,6 @@ export default function App() {
         ))}
       </div>
 
-      {/* Workflow stepper */}
       <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"10px 14px",marginBottom:10}}>
         <div style={{fontSize:10,color:"#bbb",textTransform:"uppercase",letterSpacing:0.9,marginBottom:8}}>Evaluation workflow — 3 tasks</div>
         <div style={{display:"flex",gap:6}}>
@@ -751,7 +722,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* ── TASK 3 ── */}
       {isPriority && (
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
           <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"12px 14px"}}>
@@ -790,14 +760,12 @@ export default function App() {
         </div>
       )}
 
-      {/* ── TASKS 1 & 2 ── */}
       {!isPriority && (
         <div style={{display:"grid",gridTemplateColumns:"260px 1fr",gap:10}}>
           <div>
             <SingleNav txns={ALL_TXN} selected={selected} onSelect={setSelected}/>
           </div>
           <div>
-            {/* Transaction header */}
             <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 155px",gap:10,alignItems:"start"}}>
                 <div>
@@ -822,14 +790,12 @@ export default function App() {
               </div>
             </div>
 
-            {/* Task 1 */}
             {isTriage && (
               <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
                 <EvalWidget step={step} expTab={expTab} saved={saved} onSave={(k,d)=>setSaved(s=>({...s,[k]:d}))}/>
               </div>
             )}
 
-            {/* Task 2 */}
             {!isTriage && (
               <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
                 <div style={{fontSize:10,color:"#bbb",textTransform:"uppercase",letterSpacing:0.9,marginBottom:10}}>Explanation view</div>
