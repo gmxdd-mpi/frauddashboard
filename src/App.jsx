@@ -237,7 +237,7 @@ function LLMPanel({tx, score}) {
         },
         body: JSON.stringify({
           model: "llama-3.1-8b-instant",
-          max_tokens: 1000,
+          max_tokens: 300,
           messages: [{ role: "user", content: prompt }],
         }),
       });
