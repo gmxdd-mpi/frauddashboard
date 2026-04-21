@@ -27,18 +27,20 @@ const PRODUCT_LABELS = { W:"Web purchase", C:"Card payment", H:"Home purchase", 
 function xgbScore(tx) {
   if (!tx) return 0;
   let s = 0.05;
-  if (tx.amount > 500) s += 0.25;
-  else if (tx.amount > 200) s += 0.12;
+  // Missing address is the strongest fraud signal in IEEE-CIS
+  if (tx.addr === null) s += 0.40;
+  // Product C = card-not-present, very strong signal
+  if (tx.product === "C") s += 0.30;
+  // Amount
+  if (tx.amount > 200) s += 0.10;
   else if (tx.amount > 100) s += 0.06;
-  if (tx.cardType === "credit") s += 0.08;
-  if (tx.dist !== null && tx.dist > 500) s += 0.15;
-  else if (tx.dist !== null && tx.dist > 100) s += 0.07;
-  if (tx.dist === null) s += 0.05; // missing distance is a weak signal
-  if (tx.addr === null) s += 0.10; // missing address is a stronger signal
-  if (tx.product === "C") s += 0.08; // card-not-present type
-  if (tx.network === "visa" && tx.cardType === "credit") s += 0.04;
-
-  return Math.min(0.99, s);
+  else if (tx.amount < 60) s -= 0.10;
+  // Distance — low distance is a legitimacy signal
+  if (tx.dist !== null && tx.dist > 200) s += 0.10;
+  if (tx.dist !== null && tx.dist < 20) s -= 0.15;
+  // Card type
+  if (tx.cardType === "credit") s += 0.05;
+  return Math.min(0.99, Math.max(0.01, s));
 }
 
 function lrScore(tx) {
