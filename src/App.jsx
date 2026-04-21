@@ -23,23 +23,23 @@ const ALL_TXN = [
 // ProductCD descriptions from IEEE-CIS documentation
 const PRODUCT_LABELS = { W:"Web purchase", C:"Card payment", H:"Home purchase", R:"Retail", S:"Service" };
 
-// Real SHAP and LIME values from trained XGBoost model on IEEE-CIS dataset
+// Real SHAP and LIME values from trained XGBoost model (scale_pos_weight=27.6) on IEEE-CIS dataset
 const REAL_EXPLANATIONS = {
-  "3519372": { score:0.0061, shap:{TransactionAmt:-1.7392,ProductCD:0.2751,card4:0.7121,card6:0.1574,addr1:-0.1767,dist1:-0.8144}, lime:{"ProductCD <= 3.00":0.0526,"TransactionAmt <= 43.32":-0.0319,"card4 <= 2.00":0.0149,"card6 <= 1.00":-0.0122,"-1.00 < dist1 <= 5.00":0.0076,"addr1 > 327.00":-0.0029} },
-  "3053108": { score:0.0038, shap:{TransactionAmt:-0.211,ProductCD:0.2458,card4:-0.307,card6:-0.703,addr1:-0.3587,dist1:-0.7195}, lime:{"ProductCD <= 3.00":0.0513,"68.77 < TransactionAmt <= 125.00":-0.0205,"card4 <= 2.00":0.0139,"card6 <= 1.00":-0.006,"dist1 > 5.00":-0.0013,"184.00 < addr1 <= 272.00":0.0007} },
-  "3492704": { score:0.1822, shap:{TransactionAmt:0.3386,ProductCD:1.3335,card4:0.1574,card6:-0.1317,addr1:0.1424,dist1:0.1649}, lime:{"TransactionAmt > 125.00":0.0656,"ProductCD <= 3.00":0.0519,"card4 <= 2.00":0.0148,"card6 <= 1.00":-0.0083,"addr1 <= 184.00":-0.0045,"dist1 <= -1.00":0.0012} },
-  "3560122": { score:0.1085, shap:{TransactionAmt:-0.3985,ProductCD:1.6835,card4:-0.1231,card6:-0.0497,addr1:0.0881,dist1:0.2004}, lime:{"ProductCD <= 3.00":0.0472,"68.77 < TransactionAmt <= 125.00":-0.0157,"card4 <= 2.00":0.0119,"card6 <= 1.00":-0.0096,"addr1 <= 184.00":-0.0083,"dist1 <= -1.00":0.0038} },
-  "3104673": { score:0.0077, shap:{TransactionAmt:-1.0736,ProductCD:0.1982,card4:0.7729,card6:0.1139,addr1:-0.6331,dist1:-0.7281}, lime:{"ProductCD <= 3.00":0.0478,"43.32 < TransactionAmt <= 68.77":-0.0202,"card4 <= 2.00":0.012,"card6 <= 1.00":-0.0104,"addr1 <= 184.00":-0.0075,"-1.00 < dist1 <= 5.00":-0.0002} },
-  "3320693": { score:0.2474, shap:{TransactionAmt:0.7704,ProductCD:1.0718,card4:0.0384,card6:0.2049,addr1:0.1535,dist1:0.1553}, lime:{"TransactionAmt > 125.00":0.0673,"ProductCD <= 3.00":0.0497,"card4 <= 2.00":0.0118,"card6 <= 1.00":-0.0098,"addr1 <= 184.00":-0.0057,"dist1 <= -1.00":0.0021} },
-  "3407378": { score:0.0235, shap:{TransactionAmt:-0.8175,ProductCD:0.4871,card4:0.0703,card6:0.073,addr1:-0.0337,dist1:-0.0001}, lime:{"ProductCD <= 3.00":0.0524,"43.32 < TransactionAmt <= 68.77":-0.0217,"card4 <= 2.00":0.0152,"card6 <= 1.00":-0.0125,"-1.00 < dist1 <= 5.00":0.0041,"272.00 < addr1 <= 327.00":0.0039} },
-  "3044105": { score:0.0062, shap:{TransactionAmt:-1.7672,ProductCD:0.2234,card4:0.57,card6:0.2801,addr1:-0.1075,dist1:-0.7697}, lime:{"ProductCD <= 3.00":0.0543,"TransactionAmt <= 43.32":-0.0327,"card4 <= 2.00":0.0162,"card6 <= 1.00":-0.0087,"-1.00 < dist1 <= 5.00":0.0002,"addr1 > 327.00":0.0001} },
-  "3557070": { score:0.0191, shap:{TransactionAmt:-1.2822,ProductCD:0.3355,card4:0.4298,card6:0.5438,addr1:0.4032,dist1:-0.8643}, lime:{"ProductCD <= 3.00":0.0481,"TransactionAmt <= 43.32":-0.0284,"card4 <= 2.00":0.013,"card6 <= 1.00":-0.0114,"dist1 > 5.00":-0.0052,"272.00 < addr1 <= 327.00":0.0046} },
-  "3336054": { score:0.0766, shap:{TransactionAmt:0.4765,ProductCD:0.7721,card4:-0.1791,card6:-0.3054,addr1:0.072,dist1:0.1812}, lime:{"TransactionAmt > 125.00":0.0656,"ProductCD <= 3.00":0.055,"card4 <= 2.00":0.0146,"card6 <= 1.00":-0.0134,"addr1 <= 184.00":-0.0125,"dist1 <= -1.00":0.0037} },
-  "3330843": { score:0.198,  shap:{TransactionAmt:0.1553,ProductCD:0.2542,card4:1.1791,card6:0.2565,addr1:0.201,dist1:0.0622}, lime:{"ProductCD <= 3.00":0.0426,"43.32 < TransactionAmt <= 68.77":-0.0171,"card4 <= 2.00":0.0103,"card6 <= 1.00":-0.0063,"dist1 > 5.00":-0.0047,"184.00 < addr1 <= 272.00":0.0018} },
-  "3034548": { score:0.2657, shap:{TransactionAmt:0.6298,ProductCD:1.3061,card4:0.2141,card6:0.1964,addr1:0.0057,dist1:0.138}, lime:{"TransactionAmt > 125.00":0.0673,"ProductCD <= 3.00":0.0547,"card4 <= 2.00":0.0156,"card6 <= 1.00":-0.0096,"addr1 <= 184.00":-0.0071,"dist1 <= -1.00":-0.0027} },
-  "3354853": { score:0.1614, shap:{TransactionAmt:-0.3755,ProductCD:1.6876,card4:-0.112,card6:0.4985,addr1:-0.0223,dist1:0.1828}, lime:{"ProductCD <= 3.00":0.0432,"68.77 < TransactionAmt <= 125.00":-0.0156,"card4 <= 2.00":0.0098,"card6 <= 1.00":-0.0084,"addr1 <= 184.00":-0.0072,"dist1 <= -1.00":-0.0034} },
-  "3124696": { score:0.0566, shap:{TransactionAmt:-0.0634,ProductCD:0.3812,card4:0.1475,card6:0.1699,addr1:0.0354,dist1:0.0234}, lime:{"ProductCD <= 3.00":0.0454,"TransactionAmt <= 43.32":-0.0273,"card6 <= 1.00":-0.0121,"card4 <= 2.00":0.0112,"272.00 < addr1 <= 327.00":0.0071,"dist1 > 5.00":-0.0045} },
-  "3453553": { score:0.115,  shap:{TransactionAmt:0.2195,ProductCD:1.1456,card4:-0.1814,card6:0.3096,addr1:-0.18,dist1:0.1525}, lime:{"TransactionAmt > 125.00":0.0618,"ProductCD <= 3.00":0.0448,"card4 <= 2.00":0.0144,"addr1 <= 184.00":-0.0103,"card6 <= 1.00":-0.0088,"dist1 <= -1.00":-0.0023} },
+  "3519372": { score:0.0754, shap:{TransactionAmt:-2.3667,ProductCD:-0.0615,card4:0.7712,card6:0.0789,addr1:-0.4372,dist1:-0.4749}, lime:{"card6 <= 1.00":-0.1407,"TransactionAmt <= 43.32":-0.1163,"ProductCD <= 3.00":0.1095,"card4 <= 2.00":-0.0222,"-1.00 < dist1 <= 5.00":0.015,"addr1 > 327.00":0.0038} },
+  "3053108": { score:0.0096, shap:{TransactionAmt:-0.4179,ProductCD:0.3726,card4:-0.3341,card6:-2.195,addr1:-0.5997,dist1:-1.4414}, lime:{"card6 <= 1.00":-0.1449,"ProductCD <= 3.00":0.1068,"dist1 > 5.00":-0.0815,"184.00 < addr1 <= 272.00":0.0237,"card4 <= 2.00":-0.0144,"68.77 < TransactionAmt <= 125.00":0.001} },
+  "3492704": { score:0.7733, shap:{TransactionAmt:0.2236,ProductCD:1.3541,card4:1.182,card6:-1.804,addr1:0.0501,dist1:0.2379}, lime:{"TransactionAmt > 125.00":0.1466,"card6 <= 1.00":-0.1336,"ProductCD <= 3.00":0.1169,"dist1 <= -1.00":0.0669,"addr1 <= 184.00":-0.0413,"card4 <= 2.00":0.0001} },
+  "3560122": { score:0.6856, shap:{TransactionAmt:-0.6303,ProductCD:1.6618,card4:1.1214,card6:-1.7827,addr1:0.1087,dist1:0.3171}, lime:{"card6 <= 1.00":-0.1328,"ProductCD <= 3.00":0.0974,"dist1 <= -1.00":0.0573,"addr1 <= 184.00":-0.0473,"68.77 < TransactionAmt <= 125.00":0.0112,"card4 <= 2.00":0.0007} },
+  "3104673": { score:0.0424, shap:{TransactionAmt:-1.692,ProductCD:0.1425,card4:0.4111,card6:-0.0928,addr1:-0.7315,dist1:-1.1375}, lime:{"card6 <= 1.00":-0.1366,"ProductCD <= 3.00":0.0962,"addr1 <= 184.00":-0.0508,"43.32 < TransactionAmt <= 68.77":-0.0378,"card4 <= 2.00":-0.0186,"-1.00 < dist1 <= 5.00":0.0181} },
+  "3320693": { score:0.6121, shap:{TransactionAmt:0.0002,ProductCD:1.1516,card4:-0.841,card6:0.4246,addr1:-0.4031,dist1:0.1403}, lime:{"card6 <= 1.00":-0.1373,"TransactionAmt > 125.00":0.1291,"ProductCD <= 3.00":0.1003,"dist1 <= -1.00":0.0651,"addr1 <= 184.00":-0.0519,"card4 <= 2.00":-0.0076} },
+  "3407378": { score:0.2236, shap:{TransactionAmt:-1.2778,ProductCD:0.7817,card4:-0.2332,card6:0.0495,addr1:-0.4284,dist1:-0.1203}, lime:{"card6 <= 1.00":-0.1452,"ProductCD <= 3.00":0.0952,"43.32 < TransactionAmt <= 68.77":-0.039,"272.00 < addr1 <= 327.00":0.0249,"card4 <= 2.00":-0.0141,"-1.00 < dist1 <= 5.00":0.0016} },
+  "3044105": { score:0.2868, shap:{TransactionAmt:-1.7195,ProductCD:0.025,card4:1.1008,card6:0.1131,addr1:-0.0924,dist1:-0.3217}, lime:{"card6 <= 1.00":-0.1314,"ProductCD <= 3.00":0.1027,"TransactionAmt <= 43.32":-0.1016,"-1.00 < dist1 <= 5.00":0.0152,"card4 <= 2.00":-0.0053,"addr1 > 327.00":0.0006} },
+  "3557070": { score:0.015,  shap:{TransactionAmt:-2.1688,ProductCD:0.0755,card4:-0.2918,card6:0.0731,addr1:-0.3374,dist1:-1.5203}, lime:{"card6 <= 1.00":-0.1369,"TransactionAmt <= 43.32":-0.1098,"ProductCD <= 3.00":0.0983,"dist1 > 5.00":-0.0859,"272.00 < addr1 <= 327.00":0.0252,"card4 <= 2.00":-0.0128} },
+  "3336054": { score:0.6288, shap:{TransactionAmt:0.3914,ProductCD:0.7413,card4:0.8316,card6:-1.8774,addr1:0.1754,dist1:0.2811}, lime:{"card6 <= 1.00":-0.1477,"TransactionAmt > 125.00":0.1378,"ProductCD <= 3.00":0.0992,"addr1 <= 184.00":-0.0546,"dist1 <= -1.00":0.052,"card4 <= 2.00":-0.0117} },
+  "3330843": { score:0.6229, shap:{TransactionAmt:-0.1587,ProductCD:0.2424,card4:0.5792,card6:0.2649,addr1:0.0313,dist1:-0.4408}, lime:{"card6 <= 1.00":-0.1357,"dist1 > 5.00":-0.0803,"ProductCD <= 3.00":0.0789,"43.32 < TransactionAmt <= 68.77":-0.0355,"184.00 < addr1 <= 272.00":0.0237,"card4 <= 2.00":-0.0165} },
+  "3034548": { score:0.707,  shap:{TransactionAmt:-0.1665,ProductCD:1.2921,card4:-0.2645,card6:0.2935,addr1:-0.3437,dist1:0.0864}, lime:{"card6 <= 1.00":-0.1427,"TransactionAmt > 125.00":0.1295,"ProductCD <= 3.00":0.0805,"dist1 <= -1.00":0.0609,"addr1 <= 184.00":-0.0504,"card4 <= 2.00":-0.0083} },
+  "3354853": { score:0.8778, shap:{TransactionAmt:-0.6999,ProductCD:1.7578,card4:0.1166,card6:0.4982,addr1:-0.0035,dist1:0.3187}, lime:{"card6 <= 1.00":-0.1348,"ProductCD <= 3.00":0.1209,"dist1 <= -1.00":0.0635,"addr1 <= 184.00":-0.0451,"card4 <= 2.00":-0.0102,"68.77 < TransactionAmt <= 125.00":0.0068} },
+  "3124696": { score:0.2267, shap:{TransactionAmt:-0.7779,ProductCD:0.0365,card4:-0.1829,card6:0.1153,addr1:0.0352,dist1:-0.4366}, lime:{"card6 <= 1.00":-0.1392,"TransactionAmt <= 43.32":-0.1066,"dist1 > 5.00":-0.0894,"ProductCD <= 3.00":0.0821,"272.00 < addr1 <= 327.00":0.0193,"card4 <= 2.00":-0.0151} },
+  "3453553": { score:0.8175, shap:{TransactionAmt:0.171,ProductCD:1.0238,card4:-0.2542,card6:0.346,addr1:-0.0704,dist1:0.3}, lime:{"card6 <= 1.00":-0.1426,"TransactionAmt > 125.00":0.1348,"ProductCD <= 3.00":0.1179,"dist1 <= -1.00":0.0673,"addr1 <= 184.00":-0.0532,"card4 <= 2.00":-0.0052} },
 };
 
 // XGBoost-style score based on available real features
@@ -219,6 +219,19 @@ function ShapPanel({tx}) {
   );
 }
 
+function getLime(tx) {
+  if (!tx) return [];
+  // LIME uses a local linear surrogate — different feature weights and ordering than SHAP
+  // It also tends to miss some features and overweight others due to sampling noise
+  return [
+    { f:"Product code",       v: tx.product==="C"?0.22:0.01,                          lbl:`${tx.product} · ${PRODUCT_LABELS[tx.product]||tx.product}` },
+    { f:"Address (addr1)",    v: tx.addr===null?0.17:-0.06,                            lbl:tx.addr!==null?`${tx.addr}`:"N/A" },
+    { f:"Transaction amount", v: tx.amount>200?0.09:tx.amount>100?0.04:-0.05,         lbl:`${tx.amount}` },
+    { f:"Card type",          v: tx.cardType==="credit"?0.06:-0.02,                   lbl:tx.cardType },
+    // LIME sometimes misses distance or gives it low weight
+    { f:"Distance (dist1)",   v: tx.dist===null?0.03:tx.dist>200?0.05:tx.dist<20?-0.08:-0.01, lbl:tx.dist!==null?`${tx.dist}km`:"N/A" },
+  ].sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));
+}
 
 function LimePanel({tx}) {
   const vals = getLime(tx);
