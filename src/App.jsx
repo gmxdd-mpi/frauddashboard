@@ -196,7 +196,7 @@ function LLMPanel({tx, score}) {
   const run = async () => {
     setLoading(true); setError(""); setText(""); setDone(false);
     const r = riskLevel(score);
-    const prompt = `You are an AI assistant in a bank fraud detection dashboard for anti-fraud analysts.\n\nTransaction: $${tx.amount} | ${PRODUCT_LABELS[tx.product]||tx.product} | ${tx.network} ${tx.cardType} | Address: ${tx.addr??"N/A"} | Distance: ${tx.dist!==null?tx.dist+"km":"N/A"} | Score: ${Math.round(score*100)}/100 (${r.text})\n\nWrite 3 short paragraphs: (1) key risk drivers, (2) what the model detected and any features that seem inconsistent with the score, (3) recommended action. Be concise.`;
+    const prompt = `You are an AI assistant in a bank fraud detection dashboard for anti-fraud analysts.\n\nTransaction: ${tx.amount} | ${PRODUCT_LABELS[tx.product]||tx.product} | ${tx.network} ${tx.cardType} | Address: ${tx.addr??"N/A"} | Distance: ${tx.dist!==null?tx.dist+"km":"N/A"} | Fraud score: ${Math.round(score*100)}/100 (${r.text})\n\nWrite 3 short paragraphs: (1) key risk drivers based on the features above, (2) what the model detected and any features that seem inconsistent with the score, (3) a recommended action that is proportionate to the risk score — low scores should recommend approval or minimal review, high scores should recommend blocking or escalation. Be concise and do not recommend caution if the score is low.`;
     try {
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method:"POST",
