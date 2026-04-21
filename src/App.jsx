@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 // Real transactions from IEEE-CIS Fraud Detection dataset (Kaggle, 2019)
 // groundTruth is taken directly from isFraud column in the dataset
@@ -94,8 +94,17 @@ const TRUTH_CFG = {
 const WORKFLOW = [
   {id:"triage",   icon:"🔍", label:"1 · Alert appears",              stage:"Alert Appears",   col:"#4a7c59", bg:"#e8f5ee", single:true},
   {id:"escalate", icon:"📋", label:"2 · Evaluate explanations",      stage:"Investigation",   col:"#7b5ea7", bg:"#f2eef9", single:true},
-  {id:"priority", icon:"🎯", label:"3 · Multi-alert prioritization", stage:"Batch of Alerts", col:"#b8860b", bg:"#fef9e7", single:false},
 ];
+
+// Fisher-Yates shuffle with a seed per participant so order is consistent within a session
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
 const ALL_EXP_TABS = ["SHAP","LIME","LLM","Counterfactual","Logistic regression","Decision tree","Peer cases"];
 const SPEED_EXP   = ["Under 10 sec","10–30 sec","30–60 sec","1–2 min","Over 2 min"];
@@ -500,11 +509,19 @@ function EscalateEvalWidget({expTab, expTabStartTime, saved, onSave}) {
   const key = `escalate-${expTab}`;
   const metrics = TASK_METRICS.escalate;
 
+  // Reset ratings when tab changes
+  useEffect(() => {
+    setVals({});
+    setOpen(false);
+  }, [expTab]);
+
   if (saved[key]) return (
     <div style={{marginTop:10,padding:"8px 12px",borderRadius:8,background:"#e8f7ee",fontSize:12,color:"#1a7a4a"}}>
       ✓ Evaluation saved for <strong>{expTab}</strong>
     </div>
   );
+
+  const allDone = metrics.every(m => vals[m.lbl] !== undefined);
 
   const allDone = metrics.every(m => vals[m.lbl] !== undefined);
 
@@ -749,7 +766,7 @@ export default function App() {
         <div style={{display:"flex",gap:6}}>
           {WORKFLOW.map((w,i)=>(
             <div key={w.id} style={{flex:1,display:"flex",alignItems:"center"}}>
-              <button onClick={()=>setStep(w.id)} style={{flex:1,padding:"8px 4px",border:`1px solid ${step===w.id?w.col:"#e8e8e8"}`,borderRadius:8,background:step===w.id?w.bg:"#fafafa",cursor:"pointer",textAlign:"center"}}>
+              <button onClick={()=>{setStep(w.id);setSelected(0);}} style={{flex:1,padding:"8px 4px",border:`1px solid ${step===w.id?w.col:"#e8e8e8"}`,borderRadius:8,background:step===w.id?w.bg:"#fafafa",cursor:"pointer",textAlign:"center"}}>
                 <div style={{fontSize:14}}>{w.icon}</div>
                 <div style={{fontSize:11,color:step===w.id?w.col:"#666",fontWeight:step===w.id?500:400,lineHeight:1.3}}>{w.label}</div>
                 {saved[`${w.id}-${expTab}`]&&<div style={{fontSize:9,color:"#1a7a4a",marginTop:2}}>✓ done</div>}
@@ -760,53 +777,30 @@ export default function App() {
         </div>
         <div style={{marginTop:8,padding:"10px 14px",background:"#f9f9f9",borderRadius:6,fontSize:14,color:"#555",fontWeight:500,lineHeight:1.6}}>
           {step==="triage"  &&"Review the transaction details and risk score only. Classify the transaction and record your confidence."}
-          {step==="escalate"&&"Explore the explanation views. Click 'Rate this explanation' under each tab to record your ratings."}
-          {step==="priority"&&"Rank all 15 transactions by fraud priority. Drag rows to reorder."}
-        </div>
-      </div>
-
-      {isPriority && (
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-          <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"12px 14px"}}>
-            <div style={{fontSize:10,color:"#bbb",textTransform:"uppercase",letterSpacing:0.8,marginBottom:10}}>All alerts — drag to prioritise</div>
-            <PriorityPanel txns={ALL_TXN} selected={selected} onSelect={setSelected} userRanking={userRanking} setUserRanking={setUserRanking}/>
-          </div>
-          <div>
-            <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
-              <div style={{fontSize:10,color:"#bbb",textTransform:"uppercase",letterSpacing:0.8,marginBottom:10}}>Selected transaction</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,alignItems:"start"}}>
-                <div>
-                  <div style={{fontSize:10,color:"#bbb"}}>Transaction ID</div>
-                  <div style={{fontSize:14,fontWeight:500,color:"#222"}}>TXN {tx.id}</div>
-                  <div style={{fontSize:11,color:"#888"}}>{PRODUCT_LABELS[tx.product]||tx.product}</div>
-                  <div style={{marginTop:6}}><Badge label={`${tc.icon} ${tc.label}`} col={tc.col} bg={tc.bg}/></div>
-                </div>
-                <div>
-                  <div style={{fontSize:10,color:"#bbb"}}>Amount</div>
-                  <div style={{fontSize:18,fontWeight:500,color:"#222"}}>${tx.amount.toLocaleString()}</div>
-                </div>
-                <div>
-                  <div style={{fontSize:10,color:"#bbb"}}>Card</div>
-                  <div style={{fontSize:12,color:"#555",lineHeight:1.7}}>
-                    {tx.network} · {tx.cardType}<br/>
-                    Address: {tx.addr ?? "N/A"}<br/>
-                    Distance: {tx.dist !== null ? `${tx.dist}km` : "N/A"}
-                  </div>
-                </div>
-                <Gauge score={score}/>
+          {step==="escalate"&&(
+            <div>
+              <div>Explore the explanation views for each of the 4 transactions below. Click 'Rate this explanation' under each tab to record your ratings.</div>
+              <div style={{marginTop:8,display:"flex",gap:6}}>
+                {task2Txns.map((t,i)=>{
+                  const done = ALL_EXP_TABS.every(tab=>saved[`escalate-${tab}`] && saved[`escalate-${tab}`].transaction_id===t.id || false);
+                  const isCurrent = task2Txns[selected]?.id === t.id;
+                  return (
+                    <div key={t.id} onClick={()=>setSelected(i)} style={{flex:1,padding:"6px 8px",borderRadius:8,border:`1px solid ${isCurrent?"#7b5ea7":"#e0e0e0"}`,background:isCurrent?"#f2eef9":"#fafafa",cursor:"pointer",textAlign:"center"}}>
+                      <div style={{fontSize:10,fontWeight:500,color:isCurrent?"#7b5ea7":"#888"}}>TXN {i+1}</div>
+                      <div style={{fontSize:9,color:isCurrent?"#7b5ea7":"#aaa"}}>{t.id}</div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-            <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"12px 14px"}}>
-              <EvalWidget step="priority" expTab={expTab} saved={saved} onSave={(k,d)=>setSaved(s=>({...s,[k]:d}))}/>
-            </div>
-          </div>
+          )}
         </div>
-      )}
+      </div>
 
       {!isPriority && (
         <div style={{display:"grid",gridTemplateColumns:"260px 1fr",gap:10}}>
           <div>
-            <SingleNav txns={ALL_TXN} selected={selected} onSelect={setSelected}/>
+            <SingleNav txns={step==="escalate"?task2Txns:task1Txns} selected={selected} onSelect={setSelected}/>
           </div>
           <div>
             <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
