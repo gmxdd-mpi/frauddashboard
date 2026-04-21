@@ -1,7 +1,5 @@
 import { useState, useEffect } from "react";
 
-// Real transactions from IEEE-CIS Fraud Detection dataset (Kaggle, 2019)
-// groundTruth is taken directly from isFraud column in the dataset
 const ALL_TXN = [
   { id:"3519372", amount:104.89, product:"C", network:"visa",       cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" },
   { id:"3053108", amount:152.51, product:"C", network:"visa",       cardType:"credit", addr:null, dist:null, groundTruth:"confirmed_fraud" },
@@ -20,9 +18,10 @@ const ALL_TXN = [
   { id:"3453553", amount:59.00,  product:"W", network:"visa",       cardType:"debit",  addr:204,  dist:6,    groundTruth:"legitimate"      },
 ];
 
+const TASK2_IDS = ["3053108", "3354853", "3492704", "3557070"];
+
 const PRODUCT_LABELS = { W:"Web purchase", C:"Card payment", H:"Home purchase", R:"Retail", S:"Service" };
 
-// Real SHAP and LIME values + XGBoost scores from trained model (scale_pos_weight=27.6) on IEEE-CIS dataset
 const REAL_EXPLANATIONS = {
   "3519372": { score:0.0754, shap:{TransactionAmt:-2.3667,ProductCD:-0.0615,card4:0.7712,card6:0.0789,addr1:-0.4372,dist1:-0.4749}, lime:{"card6 <= 1.00":-0.1407,"TransactionAmt <= 43.32":-0.1163,"ProductCD <= 3.00":0.1095,"card4 <= 2.00":-0.0222,"-1.00 < dist1 <= 5.00":0.015,"addr1 > 327.00":0.0038} },
   "3053108": { score:0.0096, shap:{TransactionAmt:-0.4179,ProductCD:0.3726,card4:-0.3341,card6:-2.195,addr1:-0.5997,dist1:-1.4414}, lime:{"card6 <= 1.00":-0.1449,"ProductCD <= 3.00":0.1068,"dist1 > 5.00":-0.0815,"184.00 < addr1 <= 272.00":0.0237,"card4 <= 2.00":-0.0144,"68.77 < TransactionAmt <= 125.00":0.001} },
@@ -41,48 +40,34 @@ const REAL_EXPLANATIONS = {
   "3453553": { score:0.8175, shap:{TransactionAmt:0.171,ProductCD:1.0238,card4:-0.2542,card6:0.346,addr1:-0.0704,dist1:0.3}, lime:{"card6 <= 1.00":-0.1426,"TransactionAmt > 125.00":0.1348,"ProductCD <= 3.00":0.1179,"dist1 <= -1.00":0.0673,"addr1 <= 184.00":-0.0532,"card4 <= 2.00":-0.0052} },
 };
 
-// Single scoring function — real XGBoost model output
-function xgbScore(tx) {
-  if (!tx) return 0;
-  return REAL_EXPLANATIONS[tx.id]?.score ?? 0;
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length-1; i > 0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
 }
 
-// Detect model-label mismatch for internal use only (not shown to user)
-function getModelMismatch(tx) {
-  const score = xgbScore(tx);
-  if (score >= 0.5 && tx.groundTruth === "legitimate") return "false_positive";
-  if (score < 0.5 && tx.groundTruth === "confirmed_fraud") return "false_negative";
-  return null;
-}
+function xgbScore(tx) { return tx ? (REAL_EXPLANATIONS[tx.id]?.score ?? 0) : 0; }
 
 function getShap(tx) {
   if (!tx) return [];
   const shap = REAL_EXPLANATIONS[tx.id]?.shap ?? {};
-  const labels = {
-    TransactionAmt: `$${tx.amount}`,
-    ProductCD: `${tx.product} · ${PRODUCT_LABELS[tx.product]||tx.product}`,
-    card4: tx.network,
-    card6: tx.cardType,
-    addr1: tx.addr !== null ? `${tx.addr}` : "N/A",
-    dist1: tx.dist !== null ? `${tx.dist}km` : "N/A",
-  };
-  return Object.entries(shap)
-    .map(([k,v]) => ({f:k, v, lbl:labels[k]||k}))
-    .sort((a,b) => Math.abs(b.v)-Math.abs(a.v));
+  const labels = { TransactionAmt:`$${tx.amount}`, ProductCD:`${tx.product} · ${PRODUCT_LABELS[tx.product]||tx.product}`, card4:tx.network, card6:tx.cardType, addr1:tx.addr!==null?`${tx.addr}`:"N/A", dist1:tx.dist!==null?`${tx.dist}km`:"N/A" };
+  return Object.entries(shap).map(([k,v])=>({f:k,v,lbl:labels[k]||k})).sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));
 }
 
 function getLime(tx) {
   if (!tx) return [];
   const lime = REAL_EXPLANATIONS[tx.id]?.lime ?? {};
-  return Object.entries(lime)
-    .map(([k,v]) => ({f:k, v}))
-    .sort((a,b) => Math.abs(b.v)-Math.abs(a.v));
+  return Object.entries(lime).map(([k,v])=>({f:k,v})).sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));
 }
 
 function riskLevel(s) {
-  if (s >= 0.7) return {text:"High risk",   col:"#c0392b", bg:"#fdecea"};
-  if (s >= 0.4) return {text:"Medium risk", col:"#b7770d", bg:"#fef3cd"};
-  return               {text:"Low risk",    col:"#1a7a4a", bg:"#e8f7ee"};
+  if (s>=0.7) return {text:"High risk",   col:"#c0392b", bg:"#fdecea"};
+  if (s>=0.4) return {text:"Medium risk", col:"#b7770d", bg:"#fef3cd"};
+  return             {text:"Low risk",    col:"#1a7a4a", bg:"#e8f7ee"};
 }
 
 const TRUTH_CFG = {
@@ -92,23 +77,11 @@ const TRUTH_CFG = {
 };
 
 const WORKFLOW = [
-  {id:"triage",   icon:"🔍", label:"1 · Alert appears",              stage:"Alert Appears",   col:"#4a7c59", bg:"#e8f5ee", single:true},
-  {id:"escalate", icon:"📋", label:"2 · Evaluate explanations",      stage:"Investigation",   col:"#7b5ea7", bg:"#f2eef9", single:true},
+  {id:"triage",   icon:"🔍", label:"1 · Alert appears",         stage:"Alert Appears", col:"#4a7c59", bg:"#e8f5ee"},
+  {id:"escalate", icon:"📋", label:"2 · Evaluate explanations", stage:"Investigation", col:"#7b5ea7", bg:"#f2eef9"},
 ];
 
-// Fisher-Yates shuffle with a seed per participant so order is consistent within a session
-function shuffleArray(arr) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
 const ALL_EXP_TABS = ["SHAP","LIME","LLM","Counterfactual","Logistic regression","Decision tree","Peer cases"];
-const SPEED_EXP   = ["Under 10 sec","10–30 sec","30–60 sec","1–2 min","Over 2 min"];
-const SPEED_BATCH = ["Under 1 min","1–2 min","2–3 min","3–4 min","Over 4 min"];
 
 const TASK_METRICS = {
   triage: [
@@ -119,19 +92,12 @@ const TASK_METRICS = {
     {lbl:"On a scale of 1 to 5, how clear was this explanation?", type:"clarity"},
     {lbl:"On a scale of 1 to 5, how complete was this explanation?", type:"completeness"},
   ],
-  priority: [
-    {lbl:"Prioritization accuracy", type:"pct"},
-    {lbl:"How confident are you in your prioritisation?", type:"l7"},
-    {lbl:"How long did it take you to prioritise all alerts?", type:"speed_batch"},
-  ],
 };
 
 const EXP_GROUPS = [
-  {id:"posthoc",  label:"Post-hoc explainability",  col:"#2980b9", bg:"#e8f0fe",
-   desc:"Applied after model prediction was made",
+  {id:"posthoc",  label:"Post-hoc explainability",      col:"#2980b9", bg:"#e8f0fe", desc:"Applied after model prediction was made",
    tabs:[{id:"shap",label:"SHAP"},{id:"lime",label:"LIME"},{id:"llm",label:"LLM"},{id:"counterfactual",label:"Counterfactual"}]},
-  {id:"inherent", label:"Inherently interpretable", col:"#16a085", bg:"#e8f8f5",
-   desc:"Transparent by construction — no post-hoc approximation",
+  {id:"inherent", label:"Inherently interpretable",     col:"#16a085", bg:"#e8f8f5", desc:"Transparent by construction",
    tabs:[{id:"logreg",label:"Logistic regression"},{id:"dtree",label:"Decision tree"},{id:"peers",label:"Peer cases"}]},
 ];
 
@@ -140,24 +106,23 @@ function Badge({label, col="#888", bg="#f0f0f0", sz=11}) {
 }
 
 function Gauge({score}) {
-  const pct = Math.round(Math.min(score, 0.99) * 100);
+  const pct = Math.round(Math.min(score,0.99)*100);
   const r = riskLevel(score);
-  const cx=80, cy=72, radius=54, startDeg=210, sweepDeg=120;
-  const angleDeg = startDeg+(pct/100)*sweepDeg;
-  const angleRad = angleDeg*Math.PI/180;
-  const needleX = cx+(radius-8)*Math.cos(angleRad);
-  const needleY = cy+(radius-8)*Math.sin(angleRad);
-  const x1=cx+radius*Math.cos(startDeg*Math.PI/180), y1=cy+radius*Math.sin(startDeg*Math.PI/180);
-  const x2=cx+radius*Math.cos(330*Math.PI/180),       y2=cy+radius*Math.sin(330*Math.PI/180);
-  const filledAngle=startDeg+(pct/100)*sweepDeg;
-  const fx=cx+radius*Math.cos(filledAngle*Math.PI/180), fy=cy+radius*Math.sin(filledAngle*Math.PI/180);
-  const largeArc=(pct/100)*sweepDeg>180?1:0;
+  const cx=80,cy=72,radius=54,startDeg=210,sweepDeg=120;
+  const toRad = d => d*Math.PI/180;
+  const nx = cx+(radius-8)*Math.cos(toRad(startDeg+(pct/100)*sweepDeg));
+  const ny = cy+(radius-8)*Math.sin(toRad(startDeg+(pct/100)*sweepDeg));
+  const x1=cx+radius*Math.cos(toRad(startDeg)), y1=cy+radius*Math.sin(toRad(startDeg));
+  const x2=cx+radius*Math.cos(toRad(330)),       y2=cy+radius*Math.sin(toRad(330));
+  const fa=startDeg+(pct/100)*sweepDeg;
+  const fx=cx+radius*Math.cos(toRad(fa)), fy=cy+radius*Math.sin(toRad(fa));
+  const la=(pct/100)*sweepDeg>180?1:0;
   return (
     <div style={{textAlign:"center"}}>
       <svg viewBox="0 0 160 125" width="140">
         <path d={`M${x1},${y1} A${radius},${radius},0,0,1,${x2},${y2}`} fill="none" stroke="#eee" strokeWidth="12" strokeLinecap="round"/>
-        {pct>0&&<path d={`M${x1},${y1} A${radius},${radius},0,${largeArc},1,${fx},${fy}`} fill="none" stroke={r.col} strokeWidth="12" strokeLinecap="round"/>}
-        <line x1={cx} y1={cy} x2={needleX} y2={needleY} stroke="#333" strokeWidth="2.5" strokeLinecap="round"/>
+        {pct>0&&<path d={`M${x1},${y1} A${radius},${radius},0,${la},1,${fx},${fy}`} fill="none" stroke={r.col} strokeWidth="12" strokeLinecap="round"/>}
+        <line x1={cx} y1={cy} x2={nx} y2={ny} stroke="#333" strokeWidth="2.5" strokeLinecap="round"/>
         <circle cx={cx} cy={cy} r="5" fill="#333"/>
         <text x={cx} y="100" textAnchor="middle" fontSize="22" fontWeight="500" fill={r.col}>{pct}</text>
         <text x={cx} y="116" textAnchor="middle" fontSize="11" fontWeight="500" fill={r.col}>{r.text}</text>
@@ -167,7 +132,7 @@ function Gauge({score}) {
 }
 
 function AttrBar({v, maxV=2.5}) {
-  const pct = Math.min(Math.abs(v)/maxV*100, 100);
+  const pct = Math.min(Math.abs(v)/maxV*100,100);
   return (
     <div style={{flex:1,background:"#f5f5f5",borderRadius:3,height:11,position:"relative",overflow:"hidden"}}>
       <div style={{position:"absolute",left:v>0?"50%":`${50-pct/2}%`,width:`${pct/2}%`,height:"100%",background:v>0?"#c0392b":"#1a7a4a"}}/>
@@ -178,7 +143,7 @@ function AttrBar({v, maxV=2.5}) {
 
 function ShapPanel({tx}) {
   const vals = getShap(tx);
-  const maxV = Math.max(...vals.map(d=>Math.abs(d.v)), 0.01);
+  const maxV = Math.max(...vals.map(d=>Math.abs(d.v)),0.01);
   return (
     <div>
       <div style={{fontSize:12,color:"#888",marginBottom:8}}>Per-feature contribution to XGBoost score (TreeSHAP — exact)</div>
@@ -203,7 +168,7 @@ function ShapPanel({tx}) {
 
 function LimePanel({tx}) {
   const vals = getLime(tx);
-  const maxV = Math.max(...vals.map(d=>Math.abs(d.v)), 0.01);
+  const maxV = Math.max(...vals.map(d=>Math.abs(d.v)),0.01);
   return (
     <div>
       <div style={{fontSize:12,color:"#888",marginBottom:8}}>Local linear surrogate fitted around this transaction (sampled neighbourhood)</div>
@@ -226,41 +191,24 @@ function LimePanel({tx}) {
 }
 
 function LLMPanel({tx, score}) {
-  const [text, setText] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [done, setDone] = useState(false);
-
+  const [text,setText]=useState(""); const [loading,setLoading]=useState(false);
+  const [error,setError]=useState(""); const [done,setDone]=useState(false);
   const run = async () => {
     setLoading(true); setError(""); setText(""); setDone(false);
     const r = riskLevel(score);
-    const prompt = `You are an AI assistant in a bank fraud detection dashboard for anti-fraud analysts.\n\nTransaction: ${tx.amount} | ${PRODUCT_LABELS[tx.product]||tx.product} | ${tx.network} ${tx.cardType} | Address: ${tx.addr ?? "N/A"} | Distance: ${tx.dist !== null ? tx.dist+"km" : "N/A"} | Score: ${Math.round(score*100)}/100 (${r.text})\n\nWrite 3 short paragraphs: (1) key risk drivers, (2) what the model detected and any features that seem inconsistent with the score, (3) recommended action. Be concise.`;
+    const prompt = `You are an AI assistant in a bank fraud detection dashboard for anti-fraud analysts.\n\nTransaction: $${tx.amount} | ${PRODUCT_LABELS[tx.product]||tx.product} | ${tx.network} ${tx.cardType} | Address: ${tx.addr??"N/A"} | Distance: ${tx.dist!==null?tx.dist+"km":"N/A"} | Score: ${Math.round(score*100)}/100 (${r.text})\n\nWrite 3 short paragraphs: (1) key risk drivers, (2) what the model detected and any features that seem inconsistent with the score, (3) recommended action. Be concise.`;
     try {
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${import.meta.env.VITE_GROQ_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: "llama-3.1-8b-instant",
-          max_tokens: 500,
-          messages: [{ role: "user", content: prompt }],
-        }),
+        method:"POST",
+        headers:{"Content-Type":"application/json","Authorization":`Bearer ${import.meta.env.VITE_GROQ_API_KEY}`},
+        body:JSON.stringify({model:"llama-3.1-8b-instant",max_tokens:400,messages:[{role:"user",content:prompt}]}),
       });
       const data = await res.json();
-      if (data.error) {
-        setError(`API error: ${data.error.message}`);
-      } else {
-        setText(data.choices[0]?.message?.content || "No response.");
-        setDone(true);
-      }
-    } catch (e) {
-      setError("API call failed. Check your API key in Vercel environment variables.");
-    }
+      if (data.error) setError(`API error: ${data.error.message}`);
+      else { setText(data.choices[0]?.message?.content||"No response."); setDone(true); }
+    } catch { setError("API call failed."); }
     setLoading(false);
   };
-
   return (
     <div>
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
@@ -277,47 +225,24 @@ function LLMPanel({tx, score}) {
 }
 
 function CounterfactualPanel({tx, score}) {
-  const pct = Math.round(score * 100);
+  const pct = Math.round(score*100);
   const shap = REAL_EXPLANATIONS[tx.id]?.shap ?? {};
-
-  // Build counterfactual changes from top positive SHAP contributors (things pushing score up)
-  const topRisk = Object.entries(shap)
-    .filter(([,v]) => v > 0)
-    .sort((a,b) => b[1]-a[1]);
-
+  const topRisk = Object.entries(shap).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
   const featureAdvice = {
-    TransactionAmt: tx.amount > 125
-      ? {icon:"💰", desc:`Reduce amount below $125 (currently ${tx.amount})`, feasible:true}
-      : {icon:"💰", desc:`Reduce amount below $43 (currently ${tx.amount})`, feasible:true},
-    ProductCD: {icon:"🖥", desc:`Use a card-present channel instead of ${PRODUCT_LABELS[tx.product]||tx.product}`, feasible:false},
-    card4: {icon:"💳", desc:`Switch card network (currently ${tx.network})`, feasible:false},
-    card6: {icon:"💳", desc:`Use ${tx.cardType==="credit"?"debit":"credit"} card instead of ${tx.cardType}`, feasible:false},
-    addr1: tx.addr === null
-      ? {icon:"📍", desc:"Provide billing address", feasible:false}
-      : {icon:"📍", desc:`Use a different billing address (currently ${tx.addr})`, feasible:false},
-    dist1: tx.dist === null
-      ? {icon:"📏", desc:"Distance information not available", feasible:false}
-      : tx.dist > 5
-        ? {icon:"📏", desc:`Reduce distance below 5km (currently ${tx.dist}km)`, feasible:false}
-        : {icon:"📏", desc:`Distance already low (${tx.dist}km)`, feasible:false},
+    TransactionAmt: tx.amount>125 ? {icon:"💰",desc:`Amount of $${tx.amount} is unusually high — verify with cardholder`,feasible:true} : {icon:"💰",desc:`Amount of $${tx.amount} is within normal range`,feasible:true},
+    ProductCD: {icon:"🖥",desc:`${PRODUCT_LABELS[tx.product]||tx.product} — confirm channel matches cardholder behaviour`,feasible:true},
+    card4: {icon:"💳",desc:`Card network ${tx.network} — verify card is registered to this customer`,feasible:true},
+    card6: {icon:"💳",desc:`${tx.cardType} card used — check if cardholder typically uses ${tx.cardType}`,feasible:true},
+    addr1: tx.addr===null ? {icon:"📍",desc:"Billing address missing — request address verification from cardholder",feasible:true} : {icon:"📍",desc:`Billing address ${tx.addr} — confirm matches records on file`,feasible:true},
+    dist1: tx.dist===null ? {icon:"📏",desc:"Distance data unavailable — unable to assess location risk",feasible:false} : tx.dist>5 ? {icon:"📏",desc:`Transaction ${tx.dist}km from billing address — verify with cardholder`,feasible:true} : {icon:"📏",desc:`Distance of ${tx.dist}km is low — consistent with local purchase`,feasible:true},
   };
-
-  const changes = topRisk.slice(0, 4).map(([f, v]) => ({
-    ...featureAdvice[f],
-    feature: f,
-    delta: -Math.round(v * 30),
-  })).filter(c => c.desc);
-
-  if (changes.length === 0) return (
-    <div style={{fontSize:13,color:"#888",padding:"12px 0"}}>No strong positive risk drivers found for this transaction.</div>
-  );
-
-  const newScore = Math.max(2, pct + changes.reduce((a,c) => a+c.delta, 0));
-
+  const changes = topRisk.slice(0,4).map(([f,v])=>({...featureAdvice[f],feature:f,delta:-Math.round(v*30)})).filter(c=>c?.desc);
+  if (!changes.length) return <div style={{fontSize:13,color:"#888",padding:"12px 0"}}>No strong positive risk drivers found.</div>;
+  const newScore = Math.max(2, pct+changes.reduce((a,c)=>a+c.delta,0));
   return (
     <div>
       <div style={{fontSize:12,color:"#888",marginBottom:10}}>Analyst actions to verify or challenge the top risk-driving features</div>
-      {changes.map((c,i) => (
+      {changes.map((c,i)=>(
         <div key={i} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"7px 0",borderBottom:"1px solid #f5f5f5"}}>
           <span style={{fontSize:15}}>{c.icon}</span>
           <div style={{flex:1}}>
@@ -336,11 +261,9 @@ function CounterfactualPanel({tx, score}) {
 }
 
 function LogRegPanel({tx}) {
-  const score = xgbScore(tx); const r = riskLevel(score);
-  const shap = REAL_EXPLANATIONS[tx.id]?.shap ?? {};
-  const coeffs = Object.entries(shap)
-    .map(([f,v]) => ({f, v}))
-    .sort((a,b) => Math.abs(b.v)-Math.abs(a.v));
+  const score=xgbScore(tx); const r=riskLevel(score);
+  const shap=REAL_EXPLANATIONS[tx.id]?.shap??{};
+  const coeffs=Object.entries(shap).map(([f,v])=>({f,v})).sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));
   return (
     <div>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
@@ -362,18 +285,15 @@ function LogRegPanel({tx}) {
 }
 
 function DTreePanel({tx}) {
-  const score = xgbScore(tx); const r = riskLevel(score);
-  const shap = REAL_EXPLANATIONS[tx.id]?.shap ?? {};
-  const topFeatures = Object.entries(shap)
-    .sort((a,b) => Math.abs(b[1])-Math.abs(a[1]))
-    .slice(0,3);
-  const featureLabels = {
-    TransactionAmt: tx.amount > 125 ? `Amount > $125 ($${tx.amount})` : tx.amount > 43 ? `$43 < Amount ≤ $125 ($${tx.amount})` : `Amount ≤ $43 ($${tx.amount})`,
-    ProductCD: `Product = ${tx.product} (${PRODUCT_LABELS[tx.product]||tx.product})`,
-    card4: `Card network = ${tx.network}`,
-    card6: `Card type = ${tx.cardType}`,
-    addr1: tx.addr !== null ? `Address present (${tx.addr})` : "Address missing",
-    dist1: tx.dist !== null ? (tx.dist <= 5 ? `Distance ≤ 5km (${tx.dist}km)` : `Distance > 5km (${tx.dist}km)`) : "Distance unknown",
+  const score=xgbScore(tx); const r=riskLevel(score);
+  const shap=REAL_EXPLANATIONS[tx.id]?.shap??{};
+  const top=Object.entries(shap).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1])).slice(0,3);
+  const fl={
+    TransactionAmt:tx.amount>125?`Amount > $125 ($${tx.amount})`:tx.amount>43?`$43 < Amount ≤ $125 ($${tx.amount})`:`Amount ≤ $43 ($${tx.amount})`,
+    ProductCD:`Product = ${tx.product} (${PRODUCT_LABELS[tx.product]||tx.product})`,
+    card4:`Card network = ${tx.network}`, card6:`Card type = ${tx.cardType}`,
+    addr1:tx.addr!==null?`Address present (${tx.addr})`:"Address missing",
+    dist1:tx.dist!==null?(tx.dist<=5?`Distance ≤ 5km (${tx.dist}km)`:`Distance > 5km (${tx.dist}km)`):"Distance unknown",
   };
   return (
     <div>
@@ -382,10 +302,10 @@ function DTreePanel({tx}) {
         <span style={{fontSize:12,color:"#888"}}>Score: <strong style={{color:r.col}}>{Math.round(score*100)}/100</strong></span>
       </div>
       <div style={{fontSize:11,color:"#aaa",marginBottom:10,fontStyle:"italic"}}>Decision path derived from top XGBoost feature contributions</div>
-      {topFeatures.map(([f,v],i)=>(
+      {top.map(([f,v],i)=>(
         <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",marginBottom:6,background:i%2===0?"#f9f9f9":"#fff",borderRadius:6,border:"1px solid #f0f0f0"}}>
           <span style={{fontSize:14,color:"#aaa"}}>{"→".repeat(i+1)}</span>
-          <span style={{fontSize:12,color:"#555",flex:1}}><strong>IF</strong> {featureLabels[f]||f}</span>
+          <span style={{fontSize:12,color:"#555",flex:1}}><strong>IF</strong> {fl[f]||f}</span>
           <Badge label={v>0?"↑ Risk":"↓ Risk"} col={v>0?"#c0392b":"#1a7a4a"} bg={v>0?"#fdecea":"#e8f7ee"}/>
         </div>
       ))}
@@ -397,123 +317,58 @@ function DTreePanel({tx}) {
 }
 
 function PeersPanel({tx}) {
-  const allOthers = ALL_TXN.filter(t=>t.id!==tx.id).map(t=>({
-    ...t,
-    sim: Math.round(100 - (
-      (t.product!==tx.product?15:0) +
-      (t.network!==tx.network?10:0) +
-      (t.cardType!==tx.cardType?10:0) +
-      Math.min(30, Math.abs(t.amount - tx.amount)/20)
-    ))
-  })).sort((a,b)=>b.sim-a.sim).slice(0,6);
-
-  const counts = Object.fromEntries(Object.keys(TRUTH_CFG).map(k=>[k,allOthers.filter(p=>p.groundTruth===k).length]));
+  const others=ALL_TXN.filter(t=>t.id!==tx.id).map(t=>({...t,sim:Math.round(100-((t.product!==tx.product?15:0)+(t.network!==tx.network?10:0)+(t.cardType!==tx.cardType?10:0)+Math.min(30,Math.abs(t.amount-tx.amount)/20)))})).sort((a,b)=>b.sim-a.sim).slice(0,6);
+  const counts=Object.fromEntries(Object.keys(TRUTH_CFG).map(k=>[k,others.filter(p=>p.groundTruth===k).length]));
   return (
     <div>
       <div style={{display:"flex",gap:8,marginBottom:12}}>
-        {Object.entries(counts).map(([k,v])=>{
-          const tc=TRUTH_CFG[k];
-          return <div key={k} style={{flex:1,background:tc.bg,borderRadius:8,padding:"8px",textAlign:"center"}}><div style={{fontSize:18,fontWeight:500,color:tc.col}}>{v}</div><div style={{fontSize:10,color:tc.col}}>{tc.label}</div></div>;
-        })}
+        {Object.entries(counts).map(([k,v])=>{const tc=TRUTH_CFG[k];return <div key={k} style={{flex:1,background:tc.bg,borderRadius:8,padding:"8px",textAlign:"center"}}><div style={{fontSize:18,fontWeight:500,color:tc.col}}>{v}</div><div style={{fontSize:10,color:tc.col}}>{tc.label}</div></div>;})}
       </div>
-      {allOthers.map((p,i)=>{
-        const tc=TRUTH_CFG[p.groundTruth];
-        return (
-          <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 0",borderBottom:"1px solid #f5f5f5"}}>
-            <div style={{minWidth:36,textAlign:"center"}}><div style={{fontSize:11,fontWeight:500,color:"#555"}}>{p.sim}%</div></div>
-            <div style={{width:28,height:28,borderRadius:"50%",background:tc.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:tc.col,fontWeight:700}}>{tc.icon}</div>
-            <div style={{flex:1}}>
-              <div style={{fontSize:12,color:"#333"}}>TXN {p.id} · ${p.amount}</div>
-              <div style={{fontSize:11,color:"#aaa"}}>{p.network} {p.cardType} · {PRODUCT_LABELS[p.product]||p.product}</div>
-            </div>
-            <Badge label={tc.label} col={tc.col} bg={tc.bg}/>
-          </div>
-        );
-      })}
+      {others.map((p,i)=>{const tc=TRUTH_CFG[p.groundTruth];return(
+        <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 0",borderBottom:"1px solid #f5f5f5"}}>
+          <div style={{minWidth:36,textAlign:"center"}}><div style={{fontSize:11,fontWeight:500,color:"#555"}}>{p.sim}%</div></div>
+          <div style={{width:28,height:28,borderRadius:"50%",background:tc.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:tc.col,fontWeight:700}}>{tc.icon}</div>
+          <div style={{flex:1}}><div style={{fontSize:12,color:"#333"}}>TXN {p.id} · ${p.amount}</div><div style={{fontSize:11,color:"#aaa"}}>{p.network} {p.cardType} · {PRODUCT_LABELS[p.product]||p.product}</div></div>
+          <Badge label={tc.label} col={tc.col} bg={tc.bg}/>
+        </div>
+      );})}
     </div>
   );
 }
 
 function MetricInput({m, val, onChange}) {
-  switch (m.type) {
-    case "classification":
-      return (
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          {[
-            {key:"confirmed_fraud",label:"Confirmed fraud",col:"#c0392b",bg:"#fdecea",icon:"⚠"},
-            {key:"legitimate",     label:"Legitimate",     col:"#1a7a4a",bg:"#e8f7ee",icon:"✓"},
-            {key:"suspected",      label:"Suspected fraud",col:"#8e44ad",bg:"#f5eeff",icon:"?"},
-          ].map(o=>(
-            <button key={o.key} onClick={()=>onChange(o.key)}
-              style={{padding:"9px 18px",borderRadius:10,border:`2px solid ${val===o.key?o.col:"#ddd"}`,background:val===o.key?o.bg:"#fff",color:val===o.key?o.col:"#888",fontSize:13,fontWeight:val===o.key?600:400,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
-              <span style={{fontSize:15}}>{o.icon}</span>{o.label}
-            </button>
-          ))}
-        </div>
-      );
-    case "l7":
-    case "l5": {
-      const max = m.type==="l7"?7:5;
-      return (
-        <div style={{display:"flex",gap:5,alignItems:"center"}}>
-          <span style={{fontSize:10,color:"#bbb",minWidth:24}}>low</span>
-          {Array.from({length:max},(_,i)=>i+1).map(n=>(
-            <button key={n} onClick={()=>onChange(n)} style={{width:30,height:30,borderRadius:6,border:`1px solid ${val===n?"#2980b9":"#ddd"}`,background:val===n?"#e8f0fe":"#fff",color:val===n?"#2980b9":"#888",fontSize:12,cursor:"pointer"}}>{n}</button>
-          ))}
-          <span style={{fontSize:10,color:"#bbb",minWidth:28}}>high</span>
-        </div>
-      );
+  switch(m.type) {
+    case "classification": return (
+      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+        {[{key:"confirmed_fraud",label:"Confirmed fraud",col:"#c0392b",bg:"#fdecea",icon:"⚠"},{key:"legitimate",label:"Legitimate",col:"#1a7a4a",bg:"#e8f7ee",icon:"✓"},{key:"suspected",label:"Suspected fraud",col:"#8e44ad",bg:"#f5eeff",icon:"?"}].map(o=>(
+          <button key={o.key} onClick={()=>onChange(o.key)} style={{padding:"9px 18px",borderRadius:10,border:`2px solid ${val===o.key?o.col:"#ddd"}`,background:val===o.key?o.bg:"#fff",color:val===o.key?o.col:"#888",fontSize:13,fontWeight:val===o.key?600:400,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+            <span style={{fontSize:15}}>{o.icon}</span>{o.label}
+          </button>
+        ))}
+      </div>
+    );
+    case "l7": case "l5": {
+      const max=m.type==="l7"?7:5;
+      return (<div style={{display:"flex",gap:5,alignItems:"center"}}><span style={{fontSize:10,color:"#bbb",minWidth:24}}>low</span>{Array.from({length:max},(_,i)=>i+1).map(n=>(<button key={n} onClick={()=>onChange(n)} style={{width:30,height:30,borderRadius:6,border:`1px solid ${val===n?"#2980b9":"#ddd"}`,background:val===n?"#e8f0fe":"#fff",color:val===n?"#2980b9":"#888",fontSize:12,cursor:"pointer"}}>{n}</button>))}<span style={{fontSize:10,color:"#bbb",minWidth:28}}>high</span></div>);
     }
-    case "clarity":
-    case "completeness":
-      return (
-        <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-          <span style={{fontSize:10,color:"#aaa",minWidth:68}}>Very unclear</span>
-          {[1,2,3,4,5].map(n=>(
-            <button key={n} onClick={()=>onChange(n)} style={{width:32,height:32,borderRadius:6,border:`1px solid ${val===n?"#2980b9":"#ddd"}`,background:val===n?"#e8f0fe":"#fff",color:val===n?"#2980b9":"#888",fontSize:13,cursor:"pointer"}}>{n}</button>
-          ))}
-          <span style={{fontSize:10,color:"#aaa",minWidth:58}}>Very clear</span>
-        </div>
-      );
-    case "speed_exp":
-      return (
-        <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-          {SPEED_EXP.map(o=>(
-            <button key={o} onClick={()=>onChange(o)} style={{padding:"4px 11px",borderRadius:14,border:`1px solid ${val===o?"#2980b9":"#ddd"}`,background:val===o?"#e8f0fe":"#fff",color:val===o?"#2980b9":"#666",fontSize:11,cursor:"pointer"}}>{o}</button>
-          ))}
-        </div>
-      );
-    case "speed_batch":
-      return (
-        <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-          {SPEED_BATCH.map(o=>(
-            <button key={o} onClick={()=>onChange(o)} style={{padding:"4px 11px",borderRadius:14,border:`1px solid ${val===o?"#2980b9":"#ddd"}`,background:val===o?"#e8f0fe":"#fff",color:val===o?"#2980b9":"#666",fontSize:11,cursor:"pointer"}}>{o}</button>
-          ))}
-        </div>
-      );
-    case "pct":
-      return (
-        <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-          {["<50%","50–70%","70–85%","85–95%",">95%"].map(o=>(
-            <button key={o} onClick={()=>onChange(o)} style={{padding:"4px 10px",borderRadius:14,border:`1px solid ${val===o?"#2980b9":"#ddd"}`,background:val===o?"#e8f0fe":"#fff",color:val===o?"#2980b9":"#666",fontSize:11,cursor:"pointer"}}>{o}</button>
-          ))}
-        </div>
-      );
+    case "clarity": case "completeness": return (
+      <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+        <span style={{fontSize:10,color:"#aaa",minWidth:68}}>Very unclear</span>
+        {[1,2,3,4,5].map(n=>(<button key={n} onClick={()=>onChange(n)} style={{width:32,height:32,borderRadius:6,border:`1px solid ${val===n?"#2980b9":"#ddd"}`,background:val===n?"#e8f0fe":"#fff",color:val===n?"#2980b9":"#888",fontSize:13,cursor:"pointer"}}>{n}</button>))}
+        <span style={{fontSize:10,color:"#aaa",minWidth:58}}>Very clear</span>
+      </div>
+    );
     default: return null;
   }
 }
 
-function EscalateEvalWidget({expTab, expTabStartTime, saved, onSave}) {
-  const [open, setOpen] = useState(false);
-  const [vals, setVals] = useState({});
-  const key = `escalate-${expTab}`;
-  const metrics = TASK_METRICS.escalate;
+function EscalateEvalWidget({expTab, expTabStartTime, txId, saved, onSave}) {
+  const [open,setOpen]=useState(false);
+  const [vals,setVals]=useState({});
+  const key=`escalate-${txId}-${expTab}`;
+  const metrics=TASK_METRICS.escalate;
 
-  // Reset ratings when tab changes
-  useEffect(() => {
-    setVals({});
-    setOpen(false);
-  }, [expTab]);
+  useEffect(()=>{setVals({});setOpen(false);},[expTab,txId]);
 
   if (saved[key]) return (
     <div style={{marginTop:10,padding:"8px 12px",borderRadius:8,background:"#e8f7ee",fontSize:12,color:"#1a7a4a"}}>
@@ -521,16 +376,15 @@ function EscalateEvalWidget({expTab, expTabStartTime, saved, onSave}) {
     </div>
   );
 
-  const allDone = metrics.every(m => vals[m.lbl] !== undefined);
+  const allDone=metrics.every(m=>vals[m.lbl]!==undefined);
 
   return (
     <div style={{marginTop:10,border:"1px solid #e8e8e8",borderRadius:10,overflow:"hidden"}}>
-      <button onClick={()=>setOpen(o=>!o)}
-        style={{width:"100%",padding:"10px 14px",background:open?"#f2eef9":"#fafafa",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:13,color:"#7b5ea7",fontWeight:500}}>
+      <button onClick={()=>setOpen(o=>!o)} style={{width:"100%",padding:"10px 14px",background:open?"#f2eef9":"#fafafa",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:13,color:"#7b5ea7",fontWeight:500}}>
         <span>📋 Rate this explanation — {expTab}</span>
         <span style={{fontSize:11,color:"#aaa"}}>{open?"▲ collapse":"▼ expand"}</span>
       </button>
-      {open && (
+      {open&&(
         <div style={{padding:"12px 14px",borderTop:"1px solid #f0f0f0"}}>
           {metrics.map((m,i)=>(
             <div key={i} style={{marginBottom:14}}>
@@ -538,12 +392,12 @@ function EscalateEvalWidget({expTab, expTabStartTime, saved, onSave}) {
               <MetricInput m={m} val={vals[m.lbl]} onChange={v=>setVals(p=>({...p,[m.lbl]:v}))}/>
             </div>
           ))}
-          <button onClick={()=>onSave(key,{...vals,latency_s:Math.round((Date.now()-startTime)/1000),exp:expTab,task:"escalate"})}
+          <button onClick={()=>onSave(key,{...vals,reading_time_s:Math.round((Date.now()-expTabStartTime)/1000),exp:expTab,transaction_id:txId,task:"escalate"})}
             disabled={!allDone}
             style={{padding:"7px 18px",borderRadius:8,border:`1px solid ${allDone?"#7b5ea7":"#ccc"}`,background:allDone?"#f2eef9":"#f5f5f5",color:allDone?"#7b5ea7":"#aaa",fontSize:12,cursor:allDone?"pointer":"default",fontWeight:500}}>
             Save evaluation →
           </button>
-          {!allDone && <span style={{fontSize:11,color:"#bbb",marginLeft:10}}>Complete all items to save</span>}
+          {!allDone&&<span style={{fontSize:11,color:"#bbb",marginLeft:10}}>Complete all items to save</span>}
         </div>
       )}
     </div>
@@ -551,11 +405,11 @@ function EscalateEvalWidget({expTab, expTabStartTime, saved, onSave}) {
 }
 
 function EvalWidget({step, expTab, saved, onSave}) {
-  const task = WORKFLOW.find(w=>w.id===step)||WORKFLOW[0];
-  const metrics = TASK_METRICS[step]||[];
-  const key = `${step}-${expTab}`;
-  const [vals,setVals] = useState({});
-  const [startTime] = useState(Date.now());
+  const task=WORKFLOW.find(w=>w.id===step)||WORKFLOW[0];
+  const metrics=TASK_METRICS[step]||[];
+  const key=`${step}-${expTab}`;
+  const [vals,setVals]=useState({});
+  const [startTime]=useState(Date.now());
 
   if (saved[key]) return (
     <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid #f0f0f0"}}>
@@ -563,7 +417,7 @@ function EvalWidget({step, expTab, saved, onSave}) {
     </div>
   );
 
-  const allDone = metrics.every(m => vals[m.lbl] !== undefined);
+  const allDone=metrics.every(m=>vals[m.lbl]!==undefined);
 
   return (
     <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid #f0f0f0"}}>
@@ -587,84 +441,6 @@ function EvalWidget({step, expTab, saved, onSave}) {
   );
 }
 
-function PriorityPanel({txns, selected, onSelect, userRanking, setUserRanking}) {
-  const [dragIdx,setDragIdx]=useState(null);
-  const [dragOver,setDragOver]=useState(null);
-
-  const ranked = userRanking.length===txns.length
-    ? userRanking.map(i=>({...txns[i],origIdx:i,score:xgbScore(txns[i])}))
-    : txns.map((t,i)=>({...t,origIdx:i,score:xgbScore(t)}));
-
-  const modelRanked = [...txns].map((t,i)=>({...t,origIdx:i,score:xgbScore(t)})).sort((a,b)=>b.score-a.score);
-  const modelOrder = modelRanked.map(t=>t.origIdx);
-  const userOrder  = ranked.map(t=>t.origIdx);
-  let concordant=0, discordant=0;
-  for (let i=0;i<userOrder.length;i++) for (let j=i+1;j<userOrder.length;j++) {
-    const uD=userOrder.indexOf(userOrder[i])-userOrder.indexOf(userOrder[j]);
-    const mD=modelOrder.indexOf(userOrder[i])-modelOrder.indexOf(userOrder[j]);
-    if (uD*mD>0) concordant++; else if (uD*mD<0) discordant++;
-  }
-  const tau=((concordant-discordant)/(txns.length*(txns.length-1)/2)).toFixed(2);
-  const tauColor=tau>=0.7?"#1a7a4a":tau>=0.4?"#b7770d":"#c0392b";
-  const hasCustom=userRanking.length===txns.length;
-
-  const onDragStart=i=>setDragIdx(i);
-  const onDragEnter=i=>setDragOver(i);
-  const onDragEnd=()=>{
-    if (dragIdx===null||dragOver===null||dragIdx===dragOver){setDragIdx(null);setDragOver(null);return;}
-    const next=[...ranked]; const [moved]=next.splice(dragIdx,1); next.splice(dragOver,0,moved);
-    setUserRanking(next.map(t=>t.origIdx)); setDragIdx(null); setDragOver(null);
-  };
-
-  return (
-    <div>
-      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,minHeight:32}}>
-        <div style={{fontSize:12,color:"#888",flex:1}}>Drag rows to set your priority — highest fraud risk at the top.</div>
-        <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
-          {hasCustom && (
-            <div style={{display:"flex",alignItems:"center",gap:5,padding:"4px 10px",borderRadius:8,background:"#f0f7ff",border:"1px solid #d0e8f8"}}>
-              <span style={{fontSize:11,color:"#888",whiteSpace:"nowrap"}}>τ (XGBoost):</span>
-              <span style={{fontSize:13,fontWeight:500,color:tauColor,minWidth:32,textAlign:"right"}}>{tau}</span>
-            </div>
-          )}
-          {hasCustom && (
-            <button onClick={()=>setUserRanking([])} style={{padding:"4px 10px",borderRadius:7,border:"1px solid #ddd",background:"#fafafa",color:"#888",fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}}>Reset</button>
-          )}
-        </div>
-      </div>
-      <div style={{display:"flex",gap:4,fontSize:10,color:"#888",marginBottom:4,padding:"4px 6px",background:"#f9f9f9",borderRadius:6}}>
-        <span style={{minWidth:20}}>#</span><span style={{minWidth:18}}></span>
-        <span style={{flex:1}}>Transaction</span>
-        <span style={{minWidth:48,textAlign:"center"}}>Score</span>
-        <span style={{minWidth:68,textAlign:"center"}}>Status</span>
-      </div>
-      {ranked.map((t,i)=>{
-        const r=riskLevel(t.score); const tc=TRUTH_CFG[t.groundTruth];
-        const isSelected=selected===t.origIdx; const isDragging=dragIdx===i; const isOver=dragOver===i;
-        return (
-          <div key={t.id} draggable
-            onDragStart={()=>onDragStart(i)} onDragEnter={()=>onDragEnter(i)}
-            onDragEnd={onDragEnd} onDragOver={e=>e.preventDefault()}
-            style={{display:"flex",alignItems:"center",gap:4,padding:"6px 6px",marginBottom:3,borderRadius:8,
-              border:`1px solid ${isOver?"#2980b9":isSelected?"#2980b9":"#eee"}`,
-              background:isDragging?"#e8f0fe":isOver?"#f0f7ff":isSelected?"#f0f7ff":"#fff",
-              cursor:"grab",opacity:isDragging?0.5:1}}>
-            <span style={{minWidth:20,fontSize:11,color:"#aaa",fontWeight:500}}>#{i+1}</span>
-            <span style={{minWidth:18,fontSize:14,color:"#ccc",userSelect:"none"}}>⠿</span>
-            <div onClick={()=>onSelect(t.origIdx)} style={{flex:1,minWidth:0,cursor:"pointer"}}>
-              <div style={{fontSize:11,fontWeight:500,color:"#333"}}>TXN {t.id}</div>
-              <div style={{fontSize:10,color:"#888"}}>${t.amount} · {t.network} {t.cardType} · {PRODUCT_LABELS[t.product]||t.product}</div>
-            </div>
-            <div style={{minWidth:48,textAlign:"center"}}><Badge label={Math.round(t.score*100)} col={r.col} bg={r.bg} sz={10}/></div>
-            <div style={{minWidth:68,textAlign:"center"}}><Badge label={`${tc.icon} ${tc.label}`} col={tc.col} bg={tc.bg} sz={10}/></div>
-          </div>
-        );
-      })}
-      <div style={{marginTop:8,fontSize:10,color:"#aaa"}}>⠿ drag to reorder · click row to inspect details</div>
-    </div>
-  );
-}
-
 function SingleNav({txns, selected, onSelect}) {
   const idx=(selected>=0&&selected<txns.length)?selected:0;
   const tx=txns[idx]; if(!tx)return null;
@@ -674,11 +450,9 @@ function SingleNav({txns, selected, onSelect}) {
       <div style={{fontSize:13,fontWeight:500,color:"#333",marginBottom:2}}>TXN {tx.id}</div>
       <div style={{fontSize:11,color:"#888",marginBottom:8}}>${tx.amount} · {tx.network} {tx.cardType}</div>
       <div style={{display:"flex",gap:6,justifyContent:"space-between",alignItems:"center"}}>
-        <button onClick={()=>onSelect(Math.max(0,idx-1))} disabled={idx===0}
-          style={{flex:1,padding:"6px 0",borderRadius:7,border:"1px solid #e0e0e0",background:idx===0?"#fafafa":"#fff",color:idx===0?"#ccc":"#555",fontSize:12,cursor:idx===0?"default":"pointer"}}>← Prev</button>
+        <button onClick={()=>onSelect(Math.max(0,idx-1))} disabled={idx===0} style={{flex:1,padding:"6px 0",borderRadius:7,border:"1px solid #e0e0e0",background:idx===0?"#fafafa":"#fff",color:idx===0?"#ccc":"#555",fontSize:12,cursor:idx===0?"default":"pointer"}}>← Prev</button>
         <span style={{fontSize:11,color:"#aaa"}}>{idx+1} / {txns.length}</span>
-        <button onClick={()=>onSelect(Math.min(txns.length-1,idx+1))} disabled={idx===txns.length-1}
-          style={{flex:1,padding:"6px 0",borderRadius:7,border:"1px solid #e0e0e0",background:idx===txns.length-1?"#fafafa":"#fff",color:idx===txns.length-1?"#ccc":"#555",fontSize:12,cursor:idx===txns.length-1?"default":"pointer"}}>Next →</button>
+        <button onClick={()=>onSelect(Math.min(txns.length-1,idx+1))} disabled={idx===txns.length-1} style={{flex:1,padding:"6px 0",borderRadius:7,border:"1px solid #e0e0e0",background:idx===txns.length-1?"#fafafa":"#fff",color:idx===txns.length-1?"#ccc":"#555",fontSize:12,cursor:idx===txns.length-1?"default":"pointer"}}>Next →</button>
       </div>
     </div>
   );
@@ -689,38 +463,33 @@ export default function App() {
   const [step,setStep]=useState("triage");
   const [expTab,setExpTab]=useState("shap");
   const [expTabStartTime,setExpTabStartTime]=useState(Date.now());
-
-  const handleExpTabChange = (tabId) => {
-    setExpTab(tabId);
-    setExpTabStartTime(Date.now());
-  };
   const [saved,setSaved]=useState({});
-  const [userRanking,setUserRanking]=useState([]);
   const [showMeta,setShowMeta]=useState(false);
   const participantId=useState(()=>`P-${Date.now().toString(36).toUpperCase()}`)[0];
 
-  const tx=ALL_TXN[selected]||ALL_TXN[0];
-  const score=xgbScore(tx);
-  const tc=TRUTH_CFG[tx.groundTruth];
-  const currentStep=WORKFLOW.find(w=>w.id===step)||WORKFLOW[0];
-  const isTriage=step==="triage";
-  const isPriority=step==="priority";
-  const completedCount=Object.keys(saved).length;
+  const [task1Txns]=useState(()=>shuffleArray(ALL_TXN));
+  const [task2Txns]=useState(()=>shuffleArray(ALL_TXN.filter(t=>TASK2_IDS.includes(t.id))));
 
-  const downloadCSV=()=>{
-    if(completedCount===0){alert("No responses recorded yet.");return;}
-    const metricLabels=new Set();
-    Object.values(saved).forEach(r=>Object.keys(r).forEach(k=>{if(!["latency_s","exp","task"].includes(k))metricLabels.add(k);}));
-    const fixedCols=["participant_id","timestamp","workflow_step","explanation_type","transaction_id","latency_seconds"];
-    const metricCols=[...metricLabels]; const allCols=[...fixedCols,...metricCols];
-    const rows=Object.entries(saved).map(([key,data])=>{
-      const [wfStep]=key.split("-");
-      const row={participant_id:participantId,timestamp:new Date().toISOString(),workflow_step:data.task||wfStep,explanation_type:data.exp||"",transaction_id:tx.id,latency_seconds:data.latency_s??""};
-      metricCols.forEach(col=>{row[col]=data[col]??"";});
+  const txns = step==="escalate" ? task2Txns : task1Txns;
+  const tx = txns[selected] || txns[0];
+  const score = xgbScore(tx);
+  const tc = TRUTH_CFG[tx.groundTruth];
+  const isTriage = step==="triage";
+  const completedCount = Object.keys(saved).length;
+
+  const handleExpTabChange = (tabId) => { setExpTab(tabId); setExpTabStartTime(Date.now()); };
+
+  const downloadCSV = () => {
+    if (!completedCount){alert("No responses recorded yet.");return;}
+    const allKeys=new Set(Object.values(saved).flatMap(r=>Object.keys(r)));
+    const cols=["participant_id","timestamp",...allKeys];
+    const rows=Object.entries(saved).map(([,data])=>{
+      const row={participant_id:participantId,timestamp:new Date().toISOString()};
+      allKeys.forEach(k=>{row[k]=data[k]??"";});
       return row;
     });
     const esc=v=>{const s=String(v??"");return s.includes(",")||s.includes('"')||s.includes("\n")?`"${s.replace(/"/g,'""')}"`:s;};
-    const csv=[allCols.map(esc).join(","),...rows.map(r=>allCols.map(c=>esc(r[c])).join(","))].join("\n");
+    const csv=[cols.map(esc).join(","),...rows.map(r=>cols.map(c=>esc(r[c])).join(","))].join("\n");
     const a=document.createElement("a");
     a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
     a.download=`xai_study_${participantId}_${new Date().toISOString().slice(0,10)}.csv`;
@@ -731,17 +500,16 @@ export default function App() {
     <div style={{fontFamily:"system-ui,sans-serif",padding:"1rem 0",maxWidth:1200}}>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
 
+      {/* Header */}
       <div style={{marginBottom:12}}>
         <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
           <div style={{fontSize:20,fontWeight:600}}>Fraud Dashboard with Explainable AI</div>
           <button onClick={()=>setShowMeta(m=>!m)} style={{padding:"2px 8px",borderRadius:6,border:"1px solid #ddd",background:"#f9f9f9",color:"#bbb",fontSize:10,cursor:"pointer"}}>{showMeta?"hide":"···"}</button>
-          {showMeta && (
-            <div style={{display:"flex",gap:6,alignItems:"center"}}>
-              <Badge label="IEEE-CIS Fraud Detection dataset" col="#2980b9" bg="#e8f0fe"/>
-              <Badge label="XGBoost · scale_pos_weight=27.6" col="#888" bg="#f0f0f0"/>
-              <Badge label="llama-3.1-8b-instant · Groq" col="#e65c00" bg="#fff3e0"/>
-            </div>
-          )}
+          {showMeta&&<div style={{display:"flex",gap:6,alignItems:"center"}}>
+            <Badge label="IEEE-CIS Fraud Detection dataset" col="#2980b9" bg="#e8f0fe"/>
+            <Badge label="XGBoost · scale_pos_weight=27.6" col="#888" bg="#f0f0f0"/>
+            <Badge label="llama-3.1-8b-instant · Groq" col="#e65c00" bg="#fff3e0"/>
+          </div>}
           <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:10}}>
             <span style={{fontSize:11,color:"#aaa"}}>ID: <strong style={{color:"#555"}}>{participantId}</strong></span>
             <span style={{fontSize:11,color:"#888"}}>{completedCount} response{completedCount!==1?"s":""} recorded</span>
@@ -750,6 +518,7 @@ export default function App() {
         </div>
       </div>
 
+      {/* Legend */}
       <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
         {Object.entries(TRUTH_CFG).map(([k,v])=>(
           <div key={k} style={{display:"flex",alignItems:"center",gap:5,padding:"4px 10px",borderRadius:8,background:v.bg,border:`1px solid ${v.col}30`}}>
@@ -759,33 +528,34 @@ export default function App() {
         ))}
       </div>
 
+      {/* Workflow stepper */}
       <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"10px 14px",marginBottom:10}}>
-        <div style={{fontSize:10,color:"#bbb",textTransform:"uppercase",letterSpacing:0.9,marginBottom:8}}>Evaluation workflow — 3 tasks</div>
+        <div style={{fontSize:10,color:"#bbb",textTransform:"uppercase",letterSpacing:0.9,marginBottom:8}}>Evaluation workflow — 2 tasks</div>
         <div style={{display:"flex",gap:6}}>
           {WORKFLOW.map((w,i)=>(
             <div key={w.id} style={{flex:1,display:"flex",alignItems:"center"}}>
               <button onClick={()=>{setStep(w.id);setSelected(0);}} style={{flex:1,padding:"8px 4px",border:`1px solid ${step===w.id?w.col:"#e8e8e8"}`,borderRadius:8,background:step===w.id?w.bg:"#fafafa",cursor:"pointer",textAlign:"center"}}>
                 <div style={{fontSize:14}}>{w.icon}</div>
                 <div style={{fontSize:11,color:step===w.id?w.col:"#666",fontWeight:step===w.id?500:400,lineHeight:1.3}}>{w.label}</div>
-                {saved[`${w.id}-${expTab}`]&&<div style={{fontSize:9,color:"#1a7a4a",marginTop:2}}>✓ done</div>}
               </button>
               {i<WORKFLOW.length-1&&<div style={{width:10,height:1,background:"#ddd",flexShrink:0}}/>}
             </div>
           ))}
         </div>
-        <div style={{marginTop:8,padding:"10px 14px",background:"#f9f9f9",borderRadius:6,fontSize:14,color:"#555",fontWeight:500,lineHeight:1.6}}>
-          {step==="triage"  &&"Review the transaction details and risk score only. Classify the transaction and record your confidence."}
-          {step==="escalate"&&(
+        <div style={{marginTop:8,padding:"10px 14px",background:"#f9f9f9",borderRadius:6,fontSize:13,color:"#555",lineHeight:1.6}}>
+          {isTriage && "Review each transaction's details and risk score. Classify it and record your confidence."}
+          {!isTriage && (
             <div>
-              <div>Explore the explanation views for each of the 4 transactions below. Click 'Rate this explanation' under each tab to record your ratings.</div>
-              <div style={{marginTop:8,display:"flex",gap:6}}>
+              <div style={{fontWeight:500,marginBottom:8}}>Rate all 7 explanation types for each of the 4 transactions below. Click a transaction to begin.</div>
+              <div style={{display:"flex",gap:6}}>
                 {task2Txns.map((t,i)=>{
-                  const done = ALL_EXP_TABS.every(tab=>saved[`escalate-${tab}`] && saved[`escalate-${tab}`].transaction_id===t.id || false);
-                  const isCurrent = task2Txns[selected]?.id === t.id;
+                  const isCurrent=txns[selected]?.id===t.id;
+                  const ratedCount=ALL_EXP_TABS.filter(tab=>saved[`escalate-${t.id}-${tab}`]).length;
                   return (
-                    <div key={t.id} onClick={()=>setSelected(i)} style={{flex:1,padding:"6px 8px",borderRadius:8,border:`1px solid ${isCurrent?"#7b5ea7":"#e0e0e0"}`,background:isCurrent?"#f2eef9":"#fafafa",cursor:"pointer",textAlign:"center"}}>
-                      <div style={{fontSize:10,fontWeight:500,color:isCurrent?"#7b5ea7":"#888"}}>TXN {i+1}</div>
-                      <div style={{fontSize:9,color:isCurrent?"#7b5ea7":"#aaa"}}>{t.id}</div>
+                    <div key={t.id} onClick={()=>setSelected(i)} style={{flex:1,padding:"8px",borderRadius:8,border:`2px solid ${isCurrent?"#7b5ea7":"#e0e0e0"}`,background:isCurrent?"#f2eef9":"#fafafa",cursor:"pointer",textAlign:"center"}}>
+                      <div style={{fontSize:11,fontWeight:600,color:isCurrent?"#7b5ea7":"#555"}}>TXN {i+1}</div>
+                      <div style={{fontSize:10,color:"#aaa",marginBottom:4}}>{t.id}</div>
+                      <div style={{fontSize:10,color:ratedCount===7?"#1a7a4a":isCurrent?"#7b5ea7":"#aaa",fontWeight:500}}>{ratedCount}/7 rated{ratedCount===7?" ✓":""}</div>
                     </div>
                   );
                 })}
@@ -795,76 +565,84 @@ export default function App() {
         </div>
       </div>
 
-      {!isPriority && (
-        <div style={{display:"grid",gridTemplateColumns:"260px 1fr",gap:10}}>
-          <div>
-            <SingleNav txns={step==="escalate"?task2Txns:task1Txns} selected={selected} onSelect={setSelected}/>
-          </div>
-          <div>
-            <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 155px",gap:10,alignItems:"start"}}>
-                <div>
-                  <div style={{fontSize:10,color:"#bbb"}}>Transaction ID</div>
-                  <div style={{fontSize:14,fontWeight:500,color:"#222"}}>TXN {tx.id}</div>
-                  <div style={{fontSize:11,color:"#888"}}>{PRODUCT_LABELS[tx.product]||tx.product}</div>
-                  {!isTriage && <div style={{marginTop:6}}><Badge label={`${tc.icon} ${tc.label}`} col={tc.col} bg={tc.bg}/></div>}
-                </div>
-                <div>
-                  <div style={{fontSize:10,color:"#bbb"}}>Amount</div>
-                  <div style={{fontSize:18,fontWeight:500,color:"#222"}}>${tx.amount.toLocaleString()}</div>
-                </div>
-                <div>
-                  <div style={{fontSize:10,color:"#bbb"}}>Card details</div>
-                  <div style={{fontSize:11,color:"#555",lineHeight:1.7}}>
-                    {tx.network} · {tx.cardType}<br/>
-                    Address code: {tx.addr ?? "N/A"}<br/>
-                    Distance (dist1): {tx.dist !== null ? `${tx.dist}km` : "N/A"}
-                  </div>
-                </div>
-                <Gauge score={score}/>
-              </div>
-            </div>
-
-            {isTriage && (
-              <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
-                <EvalWidget step={step} expTab={expTab} saved={saved} onSave={(k,d)=>setSaved(s=>({...s,[k]:d}))}/>
-              </div>
-            )}
-
-            {!isTriage && (
-              <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
-                <div style={{fontSize:10,color:"#bbb",textTransform:"uppercase",letterSpacing:0.9,marginBottom:10}}>Explanation view</div>
-                {EXP_GROUPS.map(g=>(
-                  <div key={g.id} style={{marginBottom:8}}>
-                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-                      <span style={{fontSize:10,fontWeight:500,color:g.col,minWidth:180,flexShrink:0}}>{g.label}</span>
-                      <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-                        {g.tabs.map(t=>(
-                          <button key={t.id} onClick={()=>handleExpTabChange(t.id)}
-                            style={{padding:"4px 10px",fontSize:11,border:`1px solid ${expTab===t.id?g.col:"#e0e0e0"}`,borderRadius:16,background:expTab===t.id?g.bg:"#fff",color:expTab===t.id?g.col:"#888",cursor:"pointer",fontWeight:expTab===t.id?500:400}}>
-                            {t.label}
-                          </button>
-                        ))}
-                      </div>
-                      <span style={{fontSize:10,color:"#ccc",fontStyle:"italic",marginLeft:"auto",maxWidth:220,textAlign:"right"}}>{g.desc}</span>
-                    </div>
-                  </div>
-                ))}
-                <div style={{borderTop:"1px solid #f0f0f0",paddingTop:14,marginTop:4}}>
-                  {expTab==="shap"           && <ShapPanel tx={tx}/>}
-                  {expTab==="lime"           && <LimePanel tx={tx}/>}
-                  {expTab==="llm"            && <LLMPanel key={tx.id} tx={tx} score={score}/>}
-                  {expTab==="counterfactual" && <CounterfactualPanel tx={tx} score={score}/>}
-                  {expTab==="logreg"         && <LogRegPanel tx={tx}/>}
-                  {expTab==="dtree"          && <DTreePanel tx={tx}/>}
-                  {expTab==="peers"          && <PeersPanel tx={tx}/>}
-                </div>
-                <EscalateEvalWidget expTab={ALL_EXP_TABS.find(t=>t.toLowerCase().replace(/ /g,"")===expTab)||expTab} expTabStartTime={expTabStartTime} saved={saved} onSave={(k,d)=>setSaved(s=>({...s,[k]:d}))}/>
-              </div>
-            )}
-          </div>
+      {/* Main layout */}
+      <div style={{display:"grid",gridTemplateColumns:"260px 1fr",gap:10}}>
+        <div>
+          <SingleNav txns={txns} selected={selected} onSelect={setSelected}/>
         </div>
-      )}
+        <div>
+          {/* Transaction header */}
+          <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 155px",gap:10,alignItems:"start"}}>
+              <div>
+                <div style={{fontSize:10,color:"#bbb"}}>Transaction ID</div>
+                <div style={{fontSize:14,fontWeight:500,color:"#222"}}>TXN {tx.id}</div>
+                <div style={{fontSize:11,color:"#888"}}>{PRODUCT_LABELS[tx.product]||tx.product}</div>
+                {!isTriage&&<div style={{marginTop:6}}><Badge label={`${tc.icon} ${tc.label}`} col={tc.col} bg={tc.bg}/></div>}
+              </div>
+              <div>
+                <div style={{fontSize:10,color:"#bbb"}}>Amount</div>
+                <div style={{fontSize:18,fontWeight:500,color:"#222"}}>${tx.amount.toLocaleString()}</div>
+              </div>
+              <div>
+                <div style={{fontSize:10,color:"#bbb"}}>Card details</div>
+                <div style={{fontSize:11,color:"#555",lineHeight:1.7}}>
+                  {tx.network} · {tx.cardType}<br/>
+                  Address code: {tx.addr??"N/A"}<br/>
+                  Distance (dist1): {tx.dist!==null?`${tx.dist}km`:"N/A"}
+                </div>
+              </div>
+              <Gauge score={score}/>
+            </div>
+          </div>
+
+          {/* Task 1 */}
+          {isTriage&&(
+            <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
+              <EvalWidget step={step} expTab={expTab} saved={saved} onSave={(k,d)=>setSaved(s=>({...s,[k]:d}))}/>
+            </div>
+          )}
+
+          {/* Task 2 */}
+          {!isTriage&&(
+            <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
+              <div style={{fontSize:10,color:"#bbb",textTransform:"uppercase",letterSpacing:0.9,marginBottom:10}}>Explanation view</div>
+              {EXP_GROUPS.map(g=>(
+                <div key={g.id} style={{marginBottom:8}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                    <span style={{fontSize:10,fontWeight:500,color:g.col,minWidth:180,flexShrink:0}}>{g.label}</span>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                      {g.tabs.map(t=>(
+                        <button key={t.id} onClick={()=>handleExpTabChange(t.id)}
+                          style={{padding:"4px 10px",fontSize:11,border:`1px solid ${expTab===t.id?g.col:"#e0e0e0"}`,borderRadius:16,background:expTab===t.id?g.bg:"#fff",color:expTab===t.id?g.col:"#888",cursor:"pointer",fontWeight:expTab===t.id?500:400}}>
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                    <span style={{fontSize:10,color:"#ccc",fontStyle:"italic",marginLeft:"auto",maxWidth:220,textAlign:"right"}}>{g.desc}</span>
+                  </div>
+                </div>
+              ))}
+              <div style={{borderTop:"1px solid #f0f0f0",paddingTop:14,marginTop:4}}>
+                {expTab==="shap"           && <ShapPanel tx={tx}/>}
+                {expTab==="lime"           && <LimePanel tx={tx}/>}
+                {expTab==="llm"            && <LLMPanel key={tx.id} tx={tx} score={score}/>}
+                {expTab==="counterfactual" && <CounterfactualPanel tx={tx} score={score}/>}
+                {expTab==="logreg"         && <LogRegPanel tx={tx}/>}
+                {expTab==="dtree"          && <DTreePanel tx={tx}/>}
+                {expTab==="peers"          && <PeersPanel tx={tx}/>}
+              </div>
+              <EscalateEvalWidget
+                expTab={ALL_EXP_TABS.find(t=>t.toLowerCase().replace(/ /g,"")===expTab)||expTab}
+                expTabStartTime={expTabStartTime}
+                txId={tx.id}
+                saved={saved}
+                onSave={(k,d)=>setSaved(s=>({...s,[k]:d}))}
+              />
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
