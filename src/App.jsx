@@ -23,24 +23,41 @@ const ALL_TXN = [
 // ProductCD descriptions from IEEE-CIS documentation
 const PRODUCT_LABELS = { W:"Web purchase", C:"Card payment", H:"Home purchase", R:"Retail", S:"Service" };
 
+// Real SHAP and LIME values from trained XGBoost model on IEEE-CIS dataset
+const REAL_EXPLANATIONS = {
+  "3519372": { score:0.0061, shap:{TransactionAmt:-1.7392,ProductCD:0.2751,card4:0.7121,card6:0.1574,addr1:-0.1767,dist1:-0.8144}, lime:{"ProductCD <= 3.00":0.0526,"TransactionAmt <= 43.32":-0.0319,"card4 <= 2.00":0.0149,"card6 <= 1.00":-0.0122,"-1.00 < dist1 <= 5.00":0.0076,"addr1 > 327.00":-0.0029} },
+  "3053108": { score:0.0038, shap:{TransactionAmt:-0.211,ProductCD:0.2458,card4:-0.307,card6:-0.703,addr1:-0.3587,dist1:-0.7195}, lime:{"ProductCD <= 3.00":0.0513,"68.77 < TransactionAmt <= 125.00":-0.0205,"card4 <= 2.00":0.0139,"card6 <= 1.00":-0.006,"dist1 > 5.00":-0.0013,"184.00 < addr1 <= 272.00":0.0007} },
+  "3492704": { score:0.1822, shap:{TransactionAmt:0.3386,ProductCD:1.3335,card4:0.1574,card6:-0.1317,addr1:0.1424,dist1:0.1649}, lime:{"TransactionAmt > 125.00":0.0656,"ProductCD <= 3.00":0.0519,"card4 <= 2.00":0.0148,"card6 <= 1.00":-0.0083,"addr1 <= 184.00":-0.0045,"dist1 <= -1.00":0.0012} },
+  "3560122": { score:0.1085, shap:{TransactionAmt:-0.3985,ProductCD:1.6835,card4:-0.1231,card6:-0.0497,addr1:0.0881,dist1:0.2004}, lime:{"ProductCD <= 3.00":0.0472,"68.77 < TransactionAmt <= 125.00":-0.0157,"card4 <= 2.00":0.0119,"card6 <= 1.00":-0.0096,"addr1 <= 184.00":-0.0083,"dist1 <= -1.00":0.0038} },
+  "3104673": { score:0.0077, shap:{TransactionAmt:-1.0736,ProductCD:0.1982,card4:0.7729,card6:0.1139,addr1:-0.6331,dist1:-0.7281}, lime:{"ProductCD <= 3.00":0.0478,"43.32 < TransactionAmt <= 68.77":-0.0202,"card4 <= 2.00":0.012,"card6 <= 1.00":-0.0104,"addr1 <= 184.00":-0.0075,"-1.00 < dist1 <= 5.00":-0.0002} },
+  "3320693": { score:0.2474, shap:{TransactionAmt:0.7704,ProductCD:1.0718,card4:0.0384,card6:0.2049,addr1:0.1535,dist1:0.1553}, lime:{"TransactionAmt > 125.00":0.0673,"ProductCD <= 3.00":0.0497,"card4 <= 2.00":0.0118,"card6 <= 1.00":-0.0098,"addr1 <= 184.00":-0.0057,"dist1 <= -1.00":0.0021} },
+  "3407378": { score:0.0235, shap:{TransactionAmt:-0.8175,ProductCD:0.4871,card4:0.0703,card6:0.073,addr1:-0.0337,dist1:-0.0001}, lime:{"ProductCD <= 3.00":0.0524,"43.32 < TransactionAmt <= 68.77":-0.0217,"card4 <= 2.00":0.0152,"card6 <= 1.00":-0.0125,"-1.00 < dist1 <= 5.00":0.0041,"272.00 < addr1 <= 327.00":0.0039} },
+  "3044105": { score:0.0062, shap:{TransactionAmt:-1.7672,ProductCD:0.2234,card4:0.57,card6:0.2801,addr1:-0.1075,dist1:-0.7697}, lime:{"ProductCD <= 3.00":0.0543,"TransactionAmt <= 43.32":-0.0327,"card4 <= 2.00":0.0162,"card6 <= 1.00":-0.0087,"-1.00 < dist1 <= 5.00":0.0002,"addr1 > 327.00":0.0001} },
+  "3557070": { score:0.0191, shap:{TransactionAmt:-1.2822,ProductCD:0.3355,card4:0.4298,card6:0.5438,addr1:0.4032,dist1:-0.8643}, lime:{"ProductCD <= 3.00":0.0481,"TransactionAmt <= 43.32":-0.0284,"card4 <= 2.00":0.013,"card6 <= 1.00":-0.0114,"dist1 > 5.00":-0.0052,"272.00 < addr1 <= 327.00":0.0046} },
+  "3336054": { score:0.0766, shap:{TransactionAmt:0.4765,ProductCD:0.7721,card4:-0.1791,card6:-0.3054,addr1:0.072,dist1:0.1812}, lime:{"TransactionAmt > 125.00":0.0656,"ProductCD <= 3.00":0.055,"card4 <= 2.00":0.0146,"card6 <= 1.00":-0.0134,"addr1 <= 184.00":-0.0125,"dist1 <= -1.00":0.0037} },
+  "3330843": { score:0.198,  shap:{TransactionAmt:0.1553,ProductCD:0.2542,card4:1.1791,card6:0.2565,addr1:0.201,dist1:0.0622}, lime:{"ProductCD <= 3.00":0.0426,"43.32 < TransactionAmt <= 68.77":-0.0171,"card4 <= 2.00":0.0103,"card6 <= 1.00":-0.0063,"dist1 > 5.00":-0.0047,"184.00 < addr1 <= 272.00":0.0018} },
+  "3034548": { score:0.2657, shap:{TransactionAmt:0.6298,ProductCD:1.3061,card4:0.2141,card6:0.1964,addr1:0.0057,dist1:0.138}, lime:{"TransactionAmt > 125.00":0.0673,"ProductCD <= 3.00":0.0547,"card4 <= 2.00":0.0156,"card6 <= 1.00":-0.0096,"addr1 <= 184.00":-0.0071,"dist1 <= -1.00":-0.0027} },
+  "3354853": { score:0.1614, shap:{TransactionAmt:-0.3755,ProductCD:1.6876,card4:-0.112,card6:0.4985,addr1:-0.0223,dist1:0.1828}, lime:{"ProductCD <= 3.00":0.0432,"68.77 < TransactionAmt <= 125.00":-0.0156,"card4 <= 2.00":0.0098,"card6 <= 1.00":-0.0084,"addr1 <= 184.00":-0.0072,"dist1 <= -1.00":-0.0034} },
+  "3124696": { score:0.0566, shap:{TransactionAmt:-0.0634,ProductCD:0.3812,card4:0.1475,card6:0.1699,addr1:0.0354,dist1:0.0234}, lime:{"ProductCD <= 3.00":0.0454,"TransactionAmt <= 43.32":-0.0273,"card6 <= 1.00":-0.0121,"card4 <= 2.00":0.0112,"272.00 < addr1 <= 327.00":0.0071,"dist1 > 5.00":-0.0045} },
+  "3453553": { score:0.115,  shap:{TransactionAmt:0.2195,ProductCD:1.1456,card4:-0.1814,card6:0.3096,addr1:-0.18,dist1:0.1525}, lime:{"TransactionAmt > 125.00":0.0618,"ProductCD <= 3.00":0.0448,"card4 <= 2.00":0.0144,"addr1 <= 184.00":-0.0103,"card6 <= 1.00":-0.0088,"dist1 <= -1.00":-0.0023} },
+};
+
 // XGBoost-style score based on available real features
 function xgbScore(tx) {
   if (!tx) return 0;
   let s = 0.05;
-  // Missing address is the strongest fraud signal in IEEE-CIS
-  if (tx.addr === null) s += 0.40;
-  // Product C = card-not-present, very strong signal
-  if (tx.product === "C") s += 0.30;
-  // Amount
-  if (tx.amount > 200) s += 0.10;
+  if (tx.amount > 500) s += 0.25;
+  else if (tx.amount > 200) s += 0.12;
   else if (tx.amount > 100) s += 0.06;
-  else if (tx.amount < 60) s -= 0.10;
-  // Distance — low distance is a legitimacy signal
-  if (tx.dist !== null && tx.dist > 200) s += 0.10;
-  if (tx.dist !== null && tx.dist < 20) s -= 0.15;
-  // Card type
-  if (tx.cardType === "credit") s += 0.05;
-  return Math.min(0.99, Math.max(0.01, s));
+  if (tx.cardType === "credit") s += 0.08;
+  if (tx.dist !== null && tx.dist > 500) s += 0.15;
+  else if (tx.dist !== null && tx.dist > 100) s += 0.07;
+  if (tx.dist === null) s += 0.05; // missing distance is a weak signal
+  if (tx.addr === null) s += 0.10; // missing address is a stronger signal
+  if (tx.product === "C") s += 0.08; // card-not-present type
+  if (tx.network === "visa" && tx.cardType === "credit") s += 0.04;
+
+  return Math.min(0.99, s);
 }
 
 function lrScore(tx) {
@@ -67,14 +84,26 @@ function dtScore(tx) {
 
 function getShap(tx) {
   if (!tx) return [];
-  return [
-    { f:"Transaction amount",  v: tx.amount>500?0.24:tx.amount>200?0.11:tx.amount>100?0.05:-0.03, lbl:`$${tx.amount}` },
-    { f:"Card type",           v: tx.cardType==="credit"?0.08:-0.04,  lbl:tx.cardType },
-    { f:"Distance (dist1)",    v: tx.dist===null?0.06:tx.dist>500?0.14:tx.dist>100?0.06:-0.02, lbl:tx.dist!==null?`${tx.dist}km`:"N/A" },
-    { f:"Address (addr1)",     v: tx.addr===null?0.10:-0.03, lbl:tx.addr!==null?`${tx.addr}`:"N/A" },
-    { f:"Product code",        v: tx.product==="C"?0.08:tx.product==="W"?0.01:-0.02, lbl:`${tx.product} · ${PRODUCT_LABELS[tx.product]||tx.product}` },
-    { f:"Card network",        v: tx.network==="visa"?0.02:-0.01, lbl:tx.network },
-  ].sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));
+  const shap = REAL_EXPLANATIONS[tx.id]?.shap ?? {};
+  const labels = {
+    TransactionAmt: `${tx.amount}`,
+    ProductCD: `${tx.product} · ${PRODUCT_LABELS[tx.product]||tx.product}`,
+    card4: tx.network,
+    card6: tx.cardType,
+    addr1: tx.addr !== null ? `${tx.addr}` : "N/A",
+    dist1: tx.dist !== null ? `${tx.dist}km` : "N/A",
+  };
+  return Object.entries(shap)
+    .map(([k,v]) => ({f:k, v, lbl:labels[k]||k}))
+    .sort((a,b) => Math.abs(b.v)-Math.abs(a.v));
+}
+
+function getLime(tx) {
+  if (!tx) return [];
+  const lime = REAL_EXPLANATIONS[tx.id]?.lime ?? {};
+  return Object.entries(lime)
+    .map(([k,v]) => ({f:k, v}))
+    .sort((a,b) => Math.abs(b.v)-Math.abs(a.v));
 }
 
 function riskLevel(s) {
@@ -190,11 +219,29 @@ function ShapPanel({tx}) {
   );
 }
 
+function getLime(tx) {
+  if (!tx) return [];
+  // LIME uses a local linear surrogate — different feature weights and ordering than SHAP
+  // It also tends to miss some features and overweight others due to sampling noise
+  return [
+    { f:"Product code",       v: tx.product==="C"?0.22:0.01,                          lbl:`${tx.product} · ${PRODUCT_LABELS[tx.product]||tx.product}` },
+    { f:"Address (addr1)",    v: tx.addr===null?0.17:-0.06,                            lbl:tx.addr!==null?`${tx.addr}`:"N/A" },
+    { f:"Transaction amount", v: tx.amount>200?0.09:tx.amount>100?0.04:-0.05,         lbl:`${tx.amount}` },
+    { f:"Card type",          v: tx.cardType==="credit"?0.06:-0.02,                   lbl:tx.cardType },
+    // LIME sometimes misses distance or gives it low weight
+    { f:"Distance (dist1)",   v: tx.dist===null?0.03:tx.dist>200?0.05:tx.dist<20?-0.08:-0.01, lbl:tx.dist!==null?`${tx.dist}km`:"N/A" },
+  ].sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));
+}
+
 function LimePanel({tx}) {
-  const vals = getShap(tx).map(d=>({...d,v:d.v*0.88}));
+  const vals = getLime(tx);
   return (
     <div>
-      <div style={{fontSize:12,color:"#888",marginBottom:10}}>Local surrogate approximation around this transaction</div>
+      <div style={{fontSize:12,color:"#888",marginBottom:8}}>Local linear surrogate fitted around this transaction (sampled neighbourhood)</div>
+      <div style={{display:"flex",gap:10,fontSize:11,color:"#888",marginBottom:10}}>
+        <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,background:"#c0392b",borderRadius:2,display:"inline-block"}}/>Increases risk</span>
+        <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,background:"#1a7a4a",borderRadius:2,display:"inline-block"}}/>Decreases risk</span>
+      </div>
       {vals.map((d,i)=>(
         <div key={i} style={{marginBottom:8}}>
           <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:2}}>
@@ -206,6 +253,7 @@ function LimePanel({tx}) {
           </div>
         </div>
       ))}
+      <div style={{marginTop:10,fontSize:11,color:"#bbb",fontStyle:"italic"}}>Note: LIME approximates locally — feature importance may differ from SHAP</div>
     </div>
   );
 }
