@@ -226,8 +226,7 @@ function LLMPanel({tx, score}) {
   const run = async () => {
     setLoading(true); setError(""); setText(""); setDone(false);
     const r = riskLevel(score);
-    const mismatch = getModelMismatch(tx);
-    const prompt = `You are an AI assistant in a bank fraud detection dashboard for anti-fraud analysts.\n\nTransaction ID: ${tx.id}\nAmount: ${tx.amount}\nProduct code: ${tx.product} (${PRODUCT_LABELS[tx.product]||tx.product})\nCard: ${tx.network} ${tx.cardType}\nAddress code: ${tx.addr ?? "not available"}\nDistance (dist1): ${tx.dist !== null ? tx.dist + "km" : "not available"}\nXGBoost fraud score: ${Math.round(score*100)}/100 (${r.text})\nGround truth label: ${tx.groundTruth}${mismatch ? `\n\nNOTE: This transaction is a likely ${mismatch.type.replace("_"," ")} — the model score and ground truth label disagree.` : ""}\n\nWrite 3 concise paragraphs: (1) overall risk and key drivers, (2) what the model detected and why${mismatch ? `, and whether this appears to be a ${mismatch.type.replace("_"," ")}` : ""}, (3) recommended action. Plain language, no bullets.`;
+    const prompt = `You are an AI assistant in a bank fraud detection dashboard for anti-fraud analysts.\n\nTransaction: ${tx.amount} | ${PRODUCT_LABELS[tx.product]||tx.product} | ${tx.network} ${tx.cardType} | Address: ${tx.addr ?? "N/A"} | Distance: ${tx.dist !== null ? tx.dist+"km" : "N/A"} | Score: ${Math.round(score*100)}/100 (${r.text})\n\nWrite 3 short paragraphs: (1) key risk drivers, (2) what the model detected and any features that seem inconsistent with the score, (3) recommended action. Be concise.`;
     try {
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
@@ -237,7 +236,7 @@ function LLMPanel({tx, score}) {
         },
         body: JSON.stringify({
           model: "llama-3.1-8b-instant",
-          max_tokens: 300,
+          max_tokens: 500,
           messages: [{ role: "user", content: prompt }],
         }),
       });
