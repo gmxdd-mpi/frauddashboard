@@ -9,14 +9,14 @@ const ALL_TXN = [
   { id:"3560122", amount:193.05, product:"C", network:"mastercard", cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" },
   { id:"3104673", amount:105.41, product:"C", network:"visa",       cardType:"credit", addr:null, dist:null, groundTruth:"confirmed_fraud" },
   { id:"3320693", amount:268.27, product:"C", network:"visa",       cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" },
-  { id:"3407378", amount:206.64, product:"C", network:"mastercard", cardType:"credit", addr:null, dist:null, groundTruth:"confirmed_fraud" },
-  { id:"3044105", amount:117.00, product:"W", network:"mastercard", cardType:"credit", addr:264,  dist:326,  groundTruth:"confirmed_fraud" },
+  { id:"3407378", amount:206.64, product:"C", network:"mastercard", cardType:"credit", addr:null, dist:null, groundTruth:"suspected"       },
+  { id:"3044105", amount:117.00, product:"W", network:"mastercard", cardType:"credit", addr:264,  dist:326,  groundTruth:"suspected"       },
   { id:"3557070", amount:29.00,  product:"W", network:"visa",       cardType:"debit",  addr:325,  dist:8,    groundTruth:"legitimate"      },
   { id:"3336054", amount:35.95,  product:"W", network:"visa",       cardType:"debit",  addr:441,  dist:3,    groundTruth:"legitimate"      },
   { id:"3330843", amount:57.95,  product:"W", network:"visa",       cardType:"debit",  addr:315,  dist:0,    groundTruth:"legitimate"      },
   { id:"3034548", amount:25.95,  product:"W", network:"visa",       cardType:"debit",  addr:441,  dist:3,    groundTruth:"legitimate"      },
   { id:"3354853", amount:25.95,  product:"W", network:"visa",       cardType:"debit",  addr:324,  dist:8,    groundTruth:"legitimate"      },
-  { id:"3124696", amount:47.95,  product:"W", network:"visa",       cardType:"debit",  addr:143,  dist:2,    groundTruth:"legitimate"      },
+  { id:"3124696", amount:47.95,  product:"W", network:"visa",       cardType:"debit",  addr:143,  dist:2,    groundTruth:"suspected"       },
   { id:"3453553", amount:59.00,  product:"W", network:"visa",       cardType:"debit",  addr:204,  dist:6,    groundTruth:"legitimate"      },
 ];
 
@@ -308,13 +308,13 @@ function CounterfactualPanel({tx, score}) {
 
   return (
     <div>
-      <div style={{fontSize:12,color:"#888",marginBottom:10}}>Changes to the top risk-driving features that would reduce the fraud score</div>
+      <div style={{fontSize:12,color:"#888",marginBottom:10}}>Analyst actions to verify or challenge the top risk-driving features</div>
       {changes.map((c,i) => (
         <div key={i} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"7px 0",borderBottom:"1px solid #f5f5f5"}}>
           <span style={{fontSize:15}}>{c.icon}</span>
           <div style={{flex:1}}>
             <div style={{fontSize:13,color:"#333"}}>{c.desc}</div>
-            <div style={{fontSize:11,color:"#aaa"}}>{c.feasible?"Can be verified":"Fixed historical fact — cannot change"}</div>
+            <div style={{fontSize:11,color:"#aaa"}}>{c.feasible?"Analyst can verify":"Cannot be verified"}</div>
           </div>
           <span style={{fontSize:12,color:"#1a7a4a",fontWeight:500}}>−{Math.abs(c.delta)}</span>
         </div>
