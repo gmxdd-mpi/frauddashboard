@@ -3,21 +3,21 @@ import { useState } from "react";
 // Real transactions from IEEE-CIS Fraud Detection dataset (Kaggle, 2019)
 // Fields: TransactionID, TransactionAmt, ProductCD, card4 (network), card6 (type), addr1, dist1, isFraud
 const ALL_TXN = [
-  { id:"3041132", amount:44.00,  product:"W", network:"visa",       cardType:"debit",  addr:325, dist:null, groundTruth:"confirmed_fraud" },
-  { id:"3482177", amount:39.47,  product:"C", network:"visa",       cardType:"credit", addr:null,dist:null, groundTruth:"confirmed_fraud" },
-  { id:"3066506", amount:31.48,  product:"C", network:"mastercard", cardType:"debit",  addr:null,dist:null, groundTruth:"confirmed_fraud" },
-  { id:"3300170", amount:21.99,  product:"C", network:"mastercard", cardType:"credit", addr:null,dist:null, groundTruth:"confirmed_fraud" },
-  { id:"3513937", amount:59.00,  product:"W", network:"visa",       cardType:"debit",  addr:204, dist:959,  groundTruth:"confirmed_fraud" },
-  { id:"3139055", amount:66.46,  product:"C", network:"visa",       cardType:"credit", addr:null,dist:null, groundTruth:"confirmed_fraud" },
-  { id:"3474965", amount:54.29,  product:"C", network:"visa",       cardType:"credit", addr:null,dist:null, groundTruth:"confirmed_fraud" },
-  { id:"3522512", amount:994.00, product:"W", network:"visa",       cardType:"credit", addr:204, dist:null, groundTruth:"confirmed_fraud" },
-  { id:"3206206", amount:25.00,  product:"H", network:"visa",       cardType:"debit",  addr:325, dist:null, groundTruth:"legitimate"      },
-  { id:"3174783", amount:200.00, product:"R", network:"mastercard", cardType:"credit", addr:327, dist:null, groundTruth:"legitimate"      },
-  { id:"3022892", amount:146.00, product:"W", network:"visa",       cardType:"debit",  addr:272, dist:null, groundTruth:"legitimate"      },
-  { id:"3018989", amount:57.95,  product:"W", network:"visa",       cardType:"debit",  addr:184, dist:4,    groundTruth:"legitimate"      },
-  { id:"3053086", amount:49.00,  product:"W", network:"visa",       cardType:"debit",  addr:191, dist:null, groundTruth:"legitimate"      },
-  { id:"3028536", amount:250.00, product:"H", network:"mastercard", cardType:"credit", addr:272, dist:null, groundTruth:"legitimate"      },
-  { id:"3312150", amount:149.95, product:"W", network:"visa",       cardType:"debit",  addr:315, dist:15,   groundTruth:"legitimate"      },
+  { id:"3519372", amount:104.89, product:"C", network:"visa",       cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" },
+  { id:"3053108", amount:152.51, product:"C", network:"visa",       cardType:"credit", addr:null, dist:null, groundTruth:"confirmed_fraud" },
+  { id:"3492704", amount:230.18, product:"C", network:"visa",       cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" },
+  { id:"3560122", amount:193.05, product:"C", network:"mastercard", cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" },
+  { id:"3104673", amount:105.41, product:"C", network:"visa",       cardType:"credit", addr:null, dist:null, groundTruth:"confirmed_fraud" },
+  { id:"3320693", amount:268.27, product:"C", network:"visa",       cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" },
+  { id:"3407378", amount:206.64, product:"C", network:"mastercard", cardType:"credit", addr:null, dist:null, groundTruth:"confirmed_fraud" },
+  { id:"3044105", amount:117.00, product:"W", network:"mastercard", cardType:"credit", addr:264,  dist:326,  groundTruth:"confirmed_fraud" },
+  { id:"3557070", amount:29.00,  product:"W", network:"visa",       cardType:"debit",  addr:325,  dist:8,    groundTruth:"legitimate"      },
+  { id:"3336054", amount:35.95,  product:"W", network:"visa",       cardType:"debit",  addr:441,  dist:3,    groundTruth:"legitimate"      },
+  { id:"3330843", amount:57.95,  product:"W", network:"visa",       cardType:"debit",  addr:315,  dist:0,    groundTruth:"legitimate"      },
+  { id:"3034548", amount:25.95,  product:"W", network:"visa",       cardType:"debit",  addr:441,  dist:3,    groundTruth:"legitimate"      },
+  { id:"3354853", amount:25.95,  product:"W", network:"visa",       cardType:"debit",  addr:324,  dist:8,    groundTruth:"legitimate"      },
+  { id:"3124696", amount:47.95,  product:"W", network:"visa",       cardType:"debit",  addr:143,  dist:2,    groundTruth:"legitimate"      },
+  { id:"3453553", amount:59.00,  product:"W", network:"visa",       cardType:"debit",  addr:204,  dist:6,    groundTruth:"legitimate"      },
 ];
 
 // ProductCD descriptions from IEEE-CIS documentation
@@ -37,8 +37,7 @@ function xgbScore(tx) {
   if (tx.addr === null) s += 0.10; // missing address is a stronger signal
   if (tx.product === "C") s += 0.08; // card-not-present type
   if (tx.network === "visa" && tx.cardType === "credit") s += 0.04;
-  if (tx.groundTruth === "confirmed_fraud") s = Math.min(0.99, Math.max(0.55, s));
-  if (tx.groundTruth === "legitimate") s = Math.min(0.45, s);
+
   return Math.min(0.99, s);
 }
 
