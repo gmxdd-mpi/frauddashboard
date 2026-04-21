@@ -523,8 +523,6 @@ function EscalateEvalWidget({expTab, expTabStartTime, saved, onSave}) {
 
   const allDone = metrics.every(m => vals[m.lbl] !== undefined);
 
-  const allDone = metrics.every(m => vals[m.lbl] !== undefined);
-
   return (
     <div style={{marginTop:10,border:"1px solid #e8e8e8",borderRadius:10,overflow:"hidden"}}>
       <button onClick={()=>setOpen(o=>!o)}
