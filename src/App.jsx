@@ -514,7 +514,7 @@ export default function App() {
           </div>}
           <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:10}}>
             <span style={{fontSize:11,color:"#aaa"}}>ID: <strong style={{color:"#555"}}>{participantId}</strong></span>
-            <span style={{fontSize:11,color:"#888"}}>{completedCount} response{completedCount!==1?"s":""} recorded</span>
+
           </div>
         </div>
       </div>
