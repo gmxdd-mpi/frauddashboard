@@ -19,7 +19,6 @@ const ALL_TXN = [
 ];
 
 const TASK2_IDS = ["3053108", "3354853", "3492704", "3557070"];
-
 const PRODUCT_LABELS = { W:"Web purchase", C:"Card payment", H:"Home purchase", R:"Retail", S:"Service" };
 
 const REAL_EXPLANATIONS = {
@@ -39,6 +38,8 @@ const REAL_EXPLANATIONS = {
   "3124696": { score:0.2267, shap:{TransactionAmt:-0.7779,ProductCD:0.0365,card4:-0.1829,card6:0.1153,addr1:0.0352,dist1:-0.4366}, lime:{"card6 <= 1.00":-0.1392,"TransactionAmt <= 43.32":-0.1066,"dist1 > 5.00":-0.0894,"ProductCD <= 3.00":0.0821,"272.00 < addr1 <= 327.00":0.0193,"card4 <= 2.00":-0.0151} },
   "3453553": { score:0.8175, shap:{TransactionAmt:0.171,ProductCD:1.0238,card4:-0.2542,card6:0.346,addr1:-0.0704,dist1:0.3}, lime:{"card6 <= 1.00":-0.1426,"TransactionAmt > 125.00":0.1348,"ProductCD <= 3.00":0.1179,"dist1 <= -1.00":0.0673,"addr1 <= 184.00":-0.0532,"card4 <= 2.00":-0.0052} },
 };
+
+const SHEET_URL = "https://script.google.com/macros/s/AKfycbw40D7CtJKFxD7H8w0BGUVBKVxVhBssaKYzjGTZaim2EJyBiN6lmw135ceAEzuAcDp1OA/exec";
 
 function shuffleArray(arr) {
   const a = [...arr];
@@ -479,21 +480,13 @@ export default function App() {
 
   const handleExpTabChange = (tabId) => { setExpTab(tabId); setExpTabStartTime(Date.now()); };
 
-  const downloadCSV = () => {
-    if (!completedCount){alert("No responses recorded yet.");return;}
-    const allKeys=new Set(Object.values(saved).flatMap(r=>Object.keys(r)));
-    const cols=["participant_id","timestamp",...allKeys];
-    const rows=Object.entries(saved).map(([,data])=>{
-      const row={participant_id:participantId,timestamp:new Date().toISOString()};
-      allKeys.forEach(k=>{row[k]=data[k]??"";});
-      return row;
-    });
-    const esc=v=>{const s=String(v??"");return s.includes(",")||s.includes('"')||s.includes("\n")?`"${s.replace(/"/g,'""')}"`:s;};
-    const csv=[cols.map(esc).join(","),...rows.map(r=>cols.map(c=>esc(r[c])).join(","))].join("\n");
-    const a=document.createElement("a");
-    a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
-    a.download=`xai_study_${participantId}_${new Date().toISOString().slice(0,10)}.csv`;
-    a.click();
+  // ── Save to local state + Google Sheet ────────────────────────────────────
+  const handleSave = (k, d) => {
+    setSaved(s => ({ ...s, [k]: d }));
+    fetch(SHEET_URL, {
+      method: "POST",
+      body: JSON.stringify({ participant_id: participantId, key: k, ...d }),
+    }).catch(() => {});
   };
 
   return (
@@ -513,7 +506,6 @@ export default function App() {
           <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:10}}>
             <span style={{fontSize:11,color:"#aaa"}}>ID: <strong style={{color:"#555"}}>{participantId}</strong></span>
             <span style={{fontSize:11,color:"#888"}}>{completedCount} response{completedCount!==1?"s":""} recorded</span>
-            <button onClick={downloadCSV} style={{padding:"6px 14px",borderRadius:8,border:"1px solid #27ae60",background:completedCount>0?"#edf7f0":"#f5f5f5",color:completedCount>0?"#1a7a4a":"#aaa",fontSize:12,fontWeight:500,cursor:completedCount>0?"pointer":"default"}}>⬇ Download CSV</button>
           </div>
         </div>
       </div>
@@ -599,7 +591,7 @@ export default function App() {
           {/* Task 1 */}
           {isTriage&&(
             <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
-              <EvalWidget step={step} expTab={expTab} saved={saved} onSave={(k,d)=>setSaved(s=>({...s,[k]:d}))}/>
+              <EvalWidget step={step} expTab={expTab} saved={saved} onSave={handleSave}/>
             </div>
           )}
 
@@ -637,7 +629,7 @@ export default function App() {
                 expTabStartTime={expTabStartTime}
                 txId={tx.id}
                 saved={saved}
-                onSave={(k,d)=>setSaved(s=>({...s,[k]:d}))}
+                onSave={handleSave}
               />
             </div>
           )}
