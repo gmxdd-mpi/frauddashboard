@@ -1,21 +1,21 @@
 import { useState, useEffect } from "react";
 
 const ALL_TXN = [
-  { id:"3519372", amount:104.89, product:"C", network:"visa",       cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" }, // isFraud=1
-  { id:"3053108", amount:152.51, product:"C", network:"visa",       cardType:"credit", addr:null, dist:null, groundTruth:"confirmed_fraud" }, // isFraud=1
-  { id:"3492704", amount:230.18, product:"C", network:"visa",       cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" }, // isFraud=1
-  { id:"3560122", amount:193.05, product:"C", network:"mastercard", cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" }, // isFraud=1
-  { id:"3104673", amount:105.41, product:"C", network:"visa",       cardType:"credit", addr:null, dist:null, groundTruth:"confirmed_fraud" }, // isFraud=1
-  { id:"3320693", amount:268.27, product:"C", network:"visa",       cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" }, // isFraud=1
-  { id:"3407378", amount:206.64, product:"C", network:"mastercard", cardType:"credit", addr:null, dist:null, groundTruth:"confirmed_fraud" }, // isFraud=1
-  { id:"3044105", amount:117.00, product:"W", network:"mastercard", cardType:"credit", addr:264,  dist:326,  groundTruth:"confirmed_fraud" }, // isFraud=1
-  { id:"3557070", amount:29.00,  product:"W", network:"visa",       cardType:"debit",  addr:325,  dist:8,    groundTruth:"legitimate"      }, // isFraud=0
-  { id:"3336054", amount:35.95,  product:"W", network:"visa",       cardType:"debit",  addr:441,  dist:3,    groundTruth:"legitimate"      }, // isFraud=0
-  { id:"3330843", amount:57.95,  product:"W", network:"visa",       cardType:"debit",  addr:315,  dist:0,    groundTruth:"legitimate"      }, // isFraud=0
-  { id:"3034548", amount:25.95,  product:"W", network:"visa",       cardType:"debit",  addr:441,  dist:3,    groundTruth:"legitimate"      }, // isFraud=0
-  { id:"3354853", amount:25.95,  product:"W", network:"visa",       cardType:"debit",  addr:324,  dist:8,    groundTruth:"legitimate"      }, // isFraud=0
-  { id:"3124696", amount:47.95,  product:"W", network:"visa",       cardType:"debit",  addr:143,  dist:2,    groundTruth:"legitimate"      }, // isFraud=0
-  { id:"3453553", amount:59.00,  product:"W", network:"visa",       cardType:"debit",  addr:204,  dist:6,    groundTruth:"legitimate"      }, // isFraud=0
+  { id:"3519372", amount:104.89, product:"C", network:"visa",       cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" },
+  { id:"3053108", amount:152.51, product:"C", network:"visa",       cardType:"credit", addr:null, dist:null, groundTruth:"confirmed_fraud" },
+  { id:"3492704", amount:230.18, product:"C", network:"visa",       cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" },
+  { id:"3560122", amount:193.05, product:"C", network:"mastercard", cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" },
+  { id:"3104673", amount:105.41, product:"C", network:"visa",       cardType:"credit", addr:null, dist:null, groundTruth:"confirmed_fraud" },
+  { id:"3320693", amount:268.27, product:"C", network:"visa",       cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" },
+  { id:"3407378", amount:206.64, product:"C", network:"mastercard", cardType:"credit", addr:null, dist:null, groundTruth:"confirmed_fraud" },
+  { id:"3044105", amount:117.00, product:"W", network:"mastercard", cardType:"credit", addr:264,  dist:326,  groundTruth:"confirmed_fraud" },
+  { id:"3557070", amount:29.00,  product:"W", network:"visa",       cardType:"debit",  addr:325,  dist:8,    groundTruth:"legitimate"      },
+  { id:"3336054", amount:35.95,  product:"W", network:"visa",       cardType:"debit",  addr:441,  dist:3,    groundTruth:"legitimate"      },
+  { id:"3330843", amount:57.95,  product:"W", network:"visa",       cardType:"debit",  addr:315,  dist:0,    groundTruth:"legitimate"      },
+  { id:"3034548", amount:25.95,  product:"W", network:"visa",       cardType:"debit",  addr:441,  dist:3,    groundTruth:"legitimate"      },
+  { id:"3354853", amount:25.95,  product:"W", network:"visa",       cardType:"debit",  addr:324,  dist:8,    groundTruth:"legitimate"      },
+  { id:"3124696", amount:47.95,  product:"W", network:"visa",       cardType:"debit",  addr:143,  dist:2,    groundTruth:"legitimate"      },
+  { id:"3453553", amount:59.00,  product:"W", network:"visa",       cardType:"debit",  addr:204,  dist:6,    groundTruth:"legitimate"      },
 ];
 
 const TASK2_IDS = ["3053108", "3354853", "3492704", "3557070"];
@@ -43,10 +43,7 @@ const SHEET_URL = "https://script.google.com/macros/s/AKfycbw40D7CtJKFxD7H8w0BGU
 
 function shuffleArray(arr) {
   const a = [...arr];
-  for (let i = a.length-1; i > 0; i--) {
-    const j = Math.floor(Math.random()*(i+1));
-    [a[i],a[j]] = [a[j],a[i]];
-  }
+  for (let i = a.length-1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
   return a;
 }
 
@@ -74,7 +71,7 @@ function riskLevel(s) {
 const TRUTH_CFG = {
   confirmed_fraud: {label:"Confirmed fraud", col:"#c0392b", bg:"#fdecea", icon:"⚠"},
   legitimate:      {label:"Legitimate",      col:"#1a7a4a", bg:"#e8f7ee", icon:"✓"},
-
+  suspected:       {label:"Suspected fraud", col:"#8e44ad", bg:"#f5eeff", icon:"?"},
 };
 
 const WORKFLOW = [
@@ -97,9 +94,9 @@ const TASK_METRICS = {
 };
 
 const EXP_GROUPS = [
-  {id:"posthoc",  label:"Post-hoc explainability",      col:"#2980b9", bg:"#e8f0fe", desc:"Applied after model prediction was made",
+  {id:"posthoc",  label:"Post-hoc explainability",  col:"#2980b9", bg:"#e8f0fe", desc:"Applied after model prediction was made",
    tabs:[{id:"shap",label:"SHAP"},{id:"lime",label:"LIME"},{id:"llm",label:"LLM"},{id:"counterfactual",label:"Counterfactual"}]},
-  {id:"inherent", label:"Inherently interpretable",     col:"#16a085", bg:"#e8f8f5", desc:"Transparent by construction",
+  {id:"inherent", label:"Inherently interpretable", col:"#16a085", bg:"#e8f8f5", desc:"Transparent by construction",
    tabs:[{id:"logreg",label:"Logistic regression"},{id:"dtree",label:"Decision tree"},{id:"peers",label:"Peer cases"}]},
 ];
 
@@ -231,12 +228,12 @@ function CounterfactualPanel({tx, score}) {
   const shap = REAL_EXPLANATIONS[tx.id]?.shap ?? {};
   const topRisk = Object.entries(shap).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
   const featureAdvice = {
-    TransactionAmt: tx.amount>125 ? {icon:"💰",desc:`Amount of $${tx.amount} is unusually high — verify with cardholder`,feasible:true} : {icon:"💰",desc:`Amount of $${tx.amount} is within normal range`,feasible:true},
-    ProductCD: {icon:"🖥",desc:`${PRODUCT_LABELS[tx.product]||tx.product} — confirm channel matches cardholder behaviour`,feasible:true},
-    card4: {icon:"💳",desc:`Card network ${tx.network} — verify card is registered to this customer`,feasible:true},
-    card6: {icon:"💳",desc:`${tx.cardType} card used — check if cardholder typically uses ${tx.cardType}`,feasible:true},
-    addr1: tx.addr===null ? {icon:"📍",desc:"Billing address missing — request address verification from cardholder",feasible:true} : {icon:"📍",desc:`Billing address ${tx.addr} — confirm matches records on file`,feasible:true},
-    dist1: tx.dist===null ? {icon:"📏",desc:"Distance data unavailable — unable to assess location risk",feasible:false} : tx.dist>5 ? {icon:"📏",desc:`Transaction ${tx.dist}km from billing address — verify with cardholder`,feasible:true} : {icon:"📏",desc:`Distance of ${tx.dist}km is low — consistent with local purchase`,feasible:true},
+    TransactionAmt: tx.amount>125?{icon:"💰",desc:`Amount of $${tx.amount} is unusually high — verify with cardholder`,feasible:true}:{icon:"💰",desc:`Amount of $${tx.amount} is within normal range`,feasible:true},
+    ProductCD:{icon:"🖥",desc:`${PRODUCT_LABELS[tx.product]||tx.product} — confirm channel matches cardholder behaviour`,feasible:true},
+    card4:{icon:"💳",desc:`Card network ${tx.network} — verify card is registered to this customer`,feasible:true},
+    card6:{icon:"💳",desc:`${tx.cardType} card used — check if cardholder typically uses ${tx.cardType}`,feasible:true},
+    addr1:tx.addr===null?{icon:"📍",desc:"Billing address missing — request address verification from cardholder",feasible:true}:{icon:"📍",desc:`Billing address ${tx.addr} — confirm matches records on file`,feasible:true},
+    dist1:tx.dist===null?{icon:"📏",desc:"Distance data unavailable — unable to assess location risk",feasible:false}:tx.dist>5?{icon:"📏",desc:`Transaction ${tx.dist}km from billing address — verify with cardholder`,feasible:true}:{icon:"📏",desc:`Distance of ${tx.dist}km is low — consistent with local purchase`,feasible:true},
   };
   const changes = topRisk.slice(0,4).map(([f,v])=>({...featureAdvice[f],feature:f,delta:-Math.round(v*30)})).filter(c=>c?.desc);
   if (!changes.length) return <div style={{fontSize:13,color:"#888",padding:"12px 0"}}>No strong positive risk drivers found.</div>;
@@ -342,7 +339,11 @@ function MetricInput({m, val, onChange}) {
   switch(m.type) {
     case "classification": return (
       <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-        {[{key:"confirmed_fraud",label:"Confirmed fraud",col:"#c0392b",bg:"#fdecea",icon:"⚠"},{key:"legitimate",label:"Legitimate",col:"#1a7a4a",bg:"#e8f7ee",icon:"✓"},].map(o=>(
+        {[
+          {key:"confirmed_fraud", label:"Confirmed fraud", col:"#c0392b", bg:"#fdecea", icon:"⚠"},
+          {key:"suspected",       label:"Suspected fraud", col:"#8e44ad", bg:"#f5eeff", icon:"?"},
+          {key:"legitimate",      label:"Legitimate",      col:"#1a7a4a", bg:"#e8f7ee", icon:"✓"},
+        ].map(o=>(
           <button key={o.key} onClick={()=>onChange(o.key)} style={{padding:"9px 18px",borderRadius:10,border:`2px solid ${val===o.key?o.col:"#ddd"}`,background:val===o.key?o.bg:"#fff",color:val===o.key?o.col:"#888",fontSize:13,fontWeight:val===o.key?600:400,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
             <span style={{fontSize:15}}>{o.icon}</span>{o.label}
           </button>
@@ -376,17 +377,9 @@ function EscalateEvalWidget({expTab, expTabStartTime, txId, saved, onSave}) {
   const [vals,setVals]=useState({});
   const key=`escalate-${txId}-${expTab}`;
   const metrics=TASK_METRICS.escalate;
-
   useEffect(()=>{setVals({});setOpen(false);},[expTab,txId]);
-
-  if (saved[key]) return (
-    <div style={{marginTop:10,padding:"8px 12px",borderRadius:8,background:"#e8f7ee",fontSize:12,color:"#1a7a4a"}}>
-      ✓ Evaluation saved for <strong>{expTab}</strong>
-    </div>
-  );
-
+  if (saved[key]) return <div style={{marginTop:10,padding:"8px 12px",borderRadius:8,background:"#e8f7ee",fontSize:12,color:"#1a7a4a"}}>✓ Evaluation saved for <strong>{expTab}</strong></div>;
   const allDone=metrics.every(m=>vals[m.lbl]!==undefined);
-
   return (
     <div style={{marginTop:10,border:"1px solid #e8e8e8",borderRadius:10,overflow:"hidden"}}>
       <button onClick={()=>setOpen(o=>!o)} style={{width:"100%",padding:"10px 14px",background:open?"#f2eef9":"#fafafa",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:13,color:"#7b5ea7",fontWeight:500}}>
@@ -419,20 +412,11 @@ function EvalWidget({step, expTab, saved, onSave, txId}) {
   const key=`${step}-${txId}`;
   const [vals,setVals]=useState({});
   const [startTime]=useState(Date.now());
-
   useEffect(()=>{setVals({});},[key]);
-
-  if (saved[key]) return (
-    <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid #f0f0f0"}}>
-      <div style={{fontSize:12,color:"#1a7a4a"}}>✓ Evaluation recorded for <em>{task.label}</em></div>
-    </div>
-  );
-
+  if (saved[key]) return <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid #f0f0f0"}}><div style={{fontSize:12,color:"#1a7a4a"}}>✓ Evaluation recorded for <em>{task.label}</em></div></div>;
   const allDone=metrics.every(m=>vals[m.lbl]!==undefined);
-
   return (
     <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid #f0f0f0"}}>
-
       {metrics.map((m,i)=>(
         <div key={i} style={{marginBottom:16}}>
           <div style={{fontSize:12,color:"#444",marginBottom:8,fontWeight:500}}>{m.lbl}</div>
@@ -483,11 +467,9 @@ export default function App() {
   const score = xgbScore(tx);
   const tc = TRUTH_CFG[tx.groundTruth];
   const isTriage = step==="triage";
-  const completedCount = Object.keys(saved).length;
 
   const handleExpTabChange = (tabId) => { setExpTab(tabId); setExpTabStartTime(Date.now()); };
 
-  // ── Save to local state + Google Sheet ────────────────────────────────────
   const handleSave = (k, d) => {
     setSaved(s => ({ ...s, [k]: d }));
     fetch(SHEET_URL, {
@@ -510,9 +492,8 @@ export default function App() {
             <Badge label="XGBoost · scale_pos_weight=27.6" col="#888" bg="#f0f0f0"/>
             <Badge label="llama-3.1-8b-instant · Groq" col="#e65c00" bg="#fff3e0"/>
           </div>}
-          <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:10}}>
+          <div style={{marginLeft:"auto"}}>
             <span style={{fontSize:11,color:"#aaa"}}>ID: <strong style={{color:"#555"}}>{participantId}</strong></span>
-
           </div>
         </div>
       </div>
@@ -570,7 +551,6 @@ export default function App() {
           <SingleNav txns={txns} selected={selected} onSelect={setSelected}/>
         </div>
         <div>
-          {/* Transaction header */}
           <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 155px",gap:10,alignItems:"start"}}>
               <div>
@@ -595,14 +575,12 @@ export default function App() {
             </div>
           </div>
 
-          {/* Task 1 */}
           {isTriage&&(
             <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
               <EvalWidget step={step} expTab={expTab} saved={saved} onSave={handleSave} txId={tx.id}/>
             </div>
           )}
 
-          {/* Task 2 */}
           {!isTriage&&(
             <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
               <div style={{fontSize:10,color:"#bbb",textTransform:"uppercase",letterSpacing:0.9,marginBottom:10}}>Explanation view</div>
