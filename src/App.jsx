@@ -83,6 +83,7 @@ const WORKFLOW = [
 ];
 
 const ALL_EXP_TABS = ["SHAP","LIME","LLM","Counterfactual","Logistic regression","Decision tree","Peer cases"];
+const TAB_ID_TO_LABEL = {shap:"SHAP",lime:"LIME",llm:"LLM",counterfactual:"Counterfactual",logreg:"Logistic regression",dtree:"Decision tree",peers:"Peer cases"};
 
 const TASK_METRICS = {
   triage: [
@@ -633,7 +634,7 @@ export default function App() {
                 {expTab==="peers"          && <PeersPanel tx={tx}/>}
               </div>
               <EscalateEvalWidget
-                expTab={ALL_EXP_TABS.find(t=>t.toLowerCase().replace(/ /g,"")===expTab)||expTab}
+                expTab={TAB_ID_TO_LABEL[expTab]||expTab}
                 expTabStartTime={expTabStartTime}
                 txId={tx.id}
                 saved={saved}
