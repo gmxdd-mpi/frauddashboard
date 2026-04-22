@@ -352,11 +352,18 @@ function MetricInput({m, val, onChange}) {
       const max=m.type==="l7"?7:5;
       return (<div style={{display:"flex",gap:5,alignItems:"center"}}><span style={{fontSize:10,color:"#bbb",minWidth:24}}>low</span>{Array.from({length:max},(_,i)=>i+1).map(n=>(<button key={n} onClick={()=>onChange(n)} style={{width:30,height:30,borderRadius:6,border:`1px solid ${val===n?"#2980b9":"#ddd"}`,background:val===n?"#e8f0fe":"#fff",color:val===n?"#2980b9":"#888",fontSize:12,cursor:"pointer"}}>{n}</button>))}<span style={{fontSize:10,color:"#bbb",minWidth:28}}>high</span></div>);
     }
-    case "clarity": case "completeness": return (
+    case "clarity": return (
       <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
         <span style={{fontSize:10,color:"#aaa",minWidth:68}}>Very unclear</span>
         {[1,2,3,4,5].map(n=>(<button key={n} onClick={()=>onChange(n)} style={{width:32,height:32,borderRadius:6,border:`1px solid ${val===n?"#2980b9":"#ddd"}`,background:val===n?"#e8f0fe":"#fff",color:val===n?"#2980b9":"#888",fontSize:13,cursor:"pointer"}}>{n}</button>))}
         <span style={{fontSize:10,color:"#aaa",minWidth:58}}>Very clear</span>
+      </div>
+    );
+    case "completeness": return (
+      <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+        <span style={{fontSize:10,color:"#aaa",minWidth:80}}>Very incomplete</span>
+        {[1,2,3,4,5].map(n=>(<button key={n} onClick={()=>onChange(n)} style={{width:32,height:32,borderRadius:6,border:`1px solid ${val===n?"#2980b9":"#ddd"}`,background:val===n?"#e8f0fe":"#fff",color:val===n?"#2980b9":"#888",fontSize:13,cursor:"pointer"}}>{n}</button>))}
+        <span style={{fontSize:10,color:"#aaa",minWidth:70}}>Very complete</span>
       </div>
     );
     default: return null;
@@ -405,12 +412,14 @@ function EscalateEvalWidget({expTab, expTabStartTime, txId, saved, onSave}) {
   );
 }
 
-function EvalWidget({step, expTab, saved, onSave}) {
+function EvalWidget({step, expTab, saved, onSave, txId}) {
   const task=WORKFLOW.find(w=>w.id===step)||WORKFLOW[0];
   const metrics=TASK_METRICS[step]||[];
-  const key=`${step}-${expTab}`;
+  const key=`${step}-${txId}`;
   const [vals,setVals]=useState({});
   const [startTime]=useState(Date.now());
+
+  useEffect(()=>{setVals({});},[key]);
 
   if (saved[key]) return (
     <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid #f0f0f0"}}>
@@ -424,7 +433,6 @@ function EvalWidget({step, expTab, saved, onSave}) {
     <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid #f0f0f0"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
         <span style={{fontSize:12,fontWeight:500,color:task.col,padding:"3px 10px",borderRadius:6,background:task.bg}}>{task.label}</span>
-        <span style={{fontSize:11,color:"#aaa"}}>Stage: {task.stage}</span>
       </div>
       {metrics.map((m,i)=>(
         <div key={i} style={{marginBottom:16}}>
@@ -591,7 +599,7 @@ export default function App() {
           {/* Task 1 */}
           {isTriage&&(
             <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
-              <EvalWidget step={step} expTab={expTab} saved={saved} onSave={handleSave}/>
+              <EvalWidget step={step} expTab={expTab} saved={saved} onSave={handleSave} txId={tx.id}/>
             </div>
           )}
 
