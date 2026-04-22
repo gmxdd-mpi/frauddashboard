@@ -1,21 +1,21 @@
 import { useState, useEffect } from "react";
 
 const ALL_TXN = [
-  { id:"3519372", amount:104.89, product:"C", network:"visa",       cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" },
-  { id:"3053108", amount:152.51, product:"C", network:"visa",       cardType:"credit", addr:null, dist:null, groundTruth:"confirmed_fraud" },
-  { id:"3492704", amount:230.18, product:"C", network:"visa",       cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" },
-  { id:"3560122", amount:193.05, product:"C", network:"mastercard", cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" },
-  { id:"3104673", amount:105.41, product:"C", network:"visa",       cardType:"credit", addr:null, dist:null, groundTruth:"confirmed_fraud" },
-  { id:"3320693", amount:268.27, product:"C", network:"visa",       cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" },
-  { id:"3407378", amount:206.64, product:"C", network:"mastercard", cardType:"credit", addr:null, dist:null, groundTruth:"suspected"       },
-  { id:"3044105", amount:117.00, product:"W", network:"mastercard", cardType:"credit", addr:264,  dist:326,  groundTruth:"suspected"       },
-  { id:"3557070", amount:29.00,  product:"W", network:"visa",       cardType:"debit",  addr:325,  dist:8,    groundTruth:"legitimate"      },
-  { id:"3336054", amount:35.95,  product:"W", network:"visa",       cardType:"debit",  addr:441,  dist:3,    groundTruth:"legitimate"      },
-  { id:"3330843", amount:57.95,  product:"W", network:"visa",       cardType:"debit",  addr:315,  dist:0,    groundTruth:"legitimate"      },
-  { id:"3034548", amount:25.95,  product:"W", network:"visa",       cardType:"debit",  addr:441,  dist:3,    groundTruth:"legitimate"      },
-  { id:"3354853", amount:25.95,  product:"W", network:"visa",       cardType:"debit",  addr:324,  dist:8,    groundTruth:"legitimate"      },
-  { id:"3124696", amount:47.95,  product:"W", network:"visa",       cardType:"debit",  addr:143,  dist:2,    groundTruth:"suspected"       },
-  { id:"3453553", amount:59.00,  product:"W", network:"visa",       cardType:"debit",  addr:204,  dist:6,    groundTruth:"legitimate"      },
+  { id:"3519372", amount:104.89, product:"C", network:"visa",       cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" }, // isFraud=1
+  { id:"3053108", amount:152.51, product:"C", network:"visa",       cardType:"credit", addr:null, dist:null, groundTruth:"confirmed_fraud" }, // isFraud=1
+  { id:"3492704", amount:230.18, product:"C", network:"visa",       cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" }, // isFraud=1
+  { id:"3560122", amount:193.05, product:"C", network:"mastercard", cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" }, // isFraud=1
+  { id:"3104673", amount:105.41, product:"C", network:"visa",       cardType:"credit", addr:null, dist:null, groundTruth:"confirmed_fraud" }, // isFraud=1
+  { id:"3320693", amount:268.27, product:"C", network:"visa",       cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" }, // isFraud=1
+  { id:"3407378", amount:206.64, product:"C", network:"mastercard", cardType:"credit", addr:null, dist:null, groundTruth:"confirmed_fraud" }, // isFraud=1
+  { id:"3044105", amount:117.00, product:"W", network:"mastercard", cardType:"credit", addr:264,  dist:326,  groundTruth:"confirmed_fraud" }, // isFraud=1
+  { id:"3557070", amount:29.00,  product:"W", network:"visa",       cardType:"debit",  addr:325,  dist:8,    groundTruth:"legitimate"      }, // isFraud=0
+  { id:"3336054", amount:35.95,  product:"W", network:"visa",       cardType:"debit",  addr:441,  dist:3,    groundTruth:"legitimate"      }, // isFraud=0
+  { id:"3330843", amount:57.95,  product:"W", network:"visa",       cardType:"debit",  addr:315,  dist:0,    groundTruth:"legitimate"      }, // isFraud=0
+  { id:"3034548", amount:25.95,  product:"W", network:"visa",       cardType:"debit",  addr:441,  dist:3,    groundTruth:"legitimate"      }, // isFraud=0
+  { id:"3354853", amount:25.95,  product:"W", network:"visa",       cardType:"debit",  addr:324,  dist:8,    groundTruth:"legitimate"      }, // isFraud=0
+  { id:"3124696", amount:47.95,  product:"W", network:"visa",       cardType:"debit",  addr:143,  dist:2,    groundTruth:"legitimate"      }, // isFraud=0
+  { id:"3453553", amount:59.00,  product:"W", network:"visa",       cardType:"debit",  addr:204,  dist:6,    groundTruth:"legitimate"      }, // isFraud=0
 ];
 
 const TASK2_IDS = ["3053108", "3354853", "3492704", "3557070"];
@@ -74,7 +74,7 @@ function riskLevel(s) {
 const TRUTH_CFG = {
   confirmed_fraud: {label:"Confirmed fraud", col:"#c0392b", bg:"#fdecea", icon:"⚠"},
   legitimate:      {label:"Legitimate",      col:"#1a7a4a", bg:"#e8f7ee", icon:"✓"},
-  suspected:       {label:"Suspected fraud", col:"#8e44ad", bg:"#f5eeff", icon:"?"},
+
 };
 
 const WORKFLOW = [
@@ -342,7 +342,7 @@ function MetricInput({m, val, onChange}) {
   switch(m.type) {
     case "classification": return (
       <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-        {[{key:"confirmed_fraud",label:"Confirmed fraud",col:"#c0392b",bg:"#fdecea",icon:"⚠"},{key:"legitimate",label:"Legitimate",col:"#1a7a4a",bg:"#e8f7ee",icon:"✓"},{key:"suspected",label:"Suspected fraud",col:"#8e44ad",bg:"#f5eeff",icon:"?"}].map(o=>(
+        {[{key:"confirmed_fraud",label:"Confirmed fraud",col:"#c0392b",bg:"#fdecea",icon:"⚠"},{key:"legitimate",label:"Legitimate",col:"#1a7a4a",bg:"#e8f7ee",icon:"✓"},].map(o=>(
           <button key={o.key} onClick={()=>onChange(o.key)} style={{padding:"9px 18px",borderRadius:10,border:`2px solid ${val===o.key?o.col:"#ddd"}`,background:val===o.key?o.bg:"#fff",color:val===o.key?o.col:"#888",fontSize:13,fontWeight:val===o.key?600:400,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
             <span style={{fontSize:15}}>{o.icon}</span>{o.label}
           </button>
@@ -517,15 +517,15 @@ export default function App() {
         </div>
       </div>
 
-      {/* Legend */}
-      <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+      {/* Legend — Task 1 only */}
+      {isTriage && <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
         {Object.entries(TRUTH_CFG).map(([k,v])=>(
           <div key={k} style={{display:"flex",alignItems:"center",gap:5,padding:"4px 10px",borderRadius:8,background:v.bg,border:`1px solid ${v.col}30`}}>
             <span style={{fontSize:13,color:v.col,fontWeight:700}}>{v.icon}</span>
             <span style={{fontSize:11,color:v.col,fontWeight:500}}>{v.label}</span>
           </div>
         ))}
-      </div>
+      </div>}
 
       {/* Workflow stepper */}
       <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"10px 14px",marginBottom:10}}>
