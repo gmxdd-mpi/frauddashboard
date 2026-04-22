@@ -137,7 +137,7 @@ function AttrBar({v, maxV=2.5}) {
   const pct = Math.min(Math.abs(v)/maxV*100,100);
   return (
     <div style={{flex:1,background:"#f5f5f5",borderRadius:3,height:11,position:"relative",overflow:"hidden"}}>
-      <div style={{position:"absolute",left:v>0?"50%":`${50-pct/2}%`,width:`${pct/2}%`,height:"100%",background:v>0?"#c0392b":"#1a7a4a"}}/>
+      <div style={{position:"absolute",left:v>0?`${50-pct/2}%`:"50%",width:`${pct/2}%`,height:"100%",background:v>0?"#c0392b":"#1a7a4a"}}/>
       <div style={{position:"absolute",left:"50%",top:0,height:"100%",width:1,background:"#ccc"}}/>
     </div>
   );
@@ -432,9 +432,7 @@ function EvalWidget({step, expTab, saved, onSave, txId}) {
 
   return (
     <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid #f0f0f0"}}>
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-        <span style={{fontSize:12,fontWeight:500,color:task.col,padding:"3px 10px",borderRadius:6,background:task.bg}}>{task.label}</span>
-      </div>
+
       {metrics.map((m,i)=>(
         <div key={i} style={{marginBottom:16}}>
           <div style={{fontSize:12,color:"#444",marginBottom:8,fontWeight:500}}>{m.lbl}</div>
