@@ -40,14 +40,13 @@ const REAL_EXPLANATIONS = {
 
 const SHEET_URL = "https://script.google.com/macros/s/AKfycbw40D7CtJKFxD7H8w0BGUVBKVxVhBssaKYzjGTZaim2EJyBiN6lmw135ceAEzuAcDp1OA/exec";
 
-// ── Feature labels (all directly from IEEE-CIS dataset documentation) ─────────
 const FEAT_LABELS = {
-  TransactionAmt: "Transaction amount (USD)",
-  ProductCD:      "Transaction channel (ProductCD)",
-  card4:          "Card network (card4)",
-  card6:          "Card type (card6)",
-  addr1:          "Billing region code (addr1)",
-  dist1:          "Distance: billing to transaction location, km (dist1)",
+  TransactionAmt:"Transaction amount (USD)",
+  ProductCD:"Transaction channel (ProductCD)",
+  card4:"Card network (card4)",
+  card6:"Card type (card6)",
+  addr1:"Billing region code (addr1)",
+  dist1:"Distance: billing to transaction location, km (dist1)",
 };
 const CHANNEL_LABELS = { W:"Web purchase", C:"Card payment", H:"Home purchase", R:"Retail", S:"Service" };
 const TAB_ID_TO_LABEL = {shap:"SHAP",lime:"LIME",llm:"LLM",counterfactual:"Counterfactual",peers:"Case-Based Reasoning (CBR)"};
@@ -77,7 +76,6 @@ const TASK_METRICS = {
   ],
 };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 function shuffleArray(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 function xgbScore(tx){return tx?(REAL_EXPLANATIONS[tx.id]?.score??0):0;}
 function riskLevel(s){
@@ -97,7 +95,6 @@ function getLimeEntries(tx){
   return Object.entries(lime).map(([k,v])=>({rule:k,v})).sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));
 }
 
-// ── Components ────────────────────────────────────────────────────────────────
 function Badge({label,col="#888",bg="#f0f0f0",sz=11}){
   return <span style={{fontSize:sz,padding:"2px 8px",borderRadius:10,background:bg,color:col,fontWeight:500,whiteSpace:"nowrap"}}>{label}</span>;
 }
@@ -138,34 +135,28 @@ function AttrBar({v,maxV=2.5}){
   );
 }
 
-// ── Risk flags (mirrors rule-fired signals in real systems like FICO Falcon) ──
-function getRiskFlags(tx, score) {
-  const flags = [];
-  if (score >= 0.7)             flags.push({code:"RF-01", label:"High fraud score",                    severity:"HIGH"});
-  if (tx.amount > 150)          flags.push({code:"RF-02", label:"Transaction amount above threshold",   severity:"HIGH"});
-  if (tx.dist !== null && tx.dist > 100) flags.push({code:"RF-03", label:"Suspicious transaction distance",  severity:"HIGH"});
-  if (tx.dist !== null && tx.dist > 20 && tx.dist <= 100) flags.push({code:"RF-03", label:"Elevated transaction distance", severity:"MED"});
-  if (tx.addr === null)         flags.push({code:"RF-04", label:"Billing address not confirmed",        severity:"MED"});
-  if (tx.product === "C" && score > 0.3) flags.push({code:"RF-05", label:"Card payment — elevated risk pattern", severity:"MED"});
-  if (tx.product === "W" && tx.dist !== null && tx.dist > 5) flags.push({code:"RF-06", label:"Web purchase with distance anomaly", severity:"MED"});
-  if (score >= 0.4 && score < 0.7) flags.push({code:"RF-07", label:"Medium fraud score — review required", severity:"MED"});
-  if (flags.length === 0)       flags.push({code:"RF-00", label:"No rules triggered — transaction within normal parameters", severity:"LOW"});
-  return flags;
+const SEV_CFG = {HIGH:{col:"#c0392b",bg:"#fdecea"},MED:{col:"#b7770d",bg:"#fef3cd"},LOW:{col:"#1a7a4a",bg:"#e8f7ee"}};
+
+function getRiskFlags(tx,score){
+  const f=[];
+  if(score>=0.7)                                          f.push({code:"RF-01",label:"High fraud score",severity:"HIGH"});
+  if(tx.amount>150)                                       f.push({code:"RF-02",label:"Transaction amount above threshold",severity:"HIGH"});
+  if(tx.dist!==null&&tx.dist>100)                         f.push({code:"RF-03",label:"Suspicious transaction distance",severity:"HIGH"});
+  if(tx.dist!==null&&tx.dist>20&&tx.dist<=100)            f.push({code:"RF-03",label:"Elevated transaction distance",severity:"MED"});
+  if(tx.addr===null)                                      f.push({code:"RF-04",label:"Billing address not confirmed",severity:"MED"});
+  if(tx.product==="C"&&score>0.3)                         f.push({code:"RF-05",label:"Card payment — elevated risk pattern",severity:"MED"});
+  if(tx.product==="W"&&tx.dist!==null&&tx.dist>5)         f.push({code:"RF-06",label:"Web purchase with distance anomaly",severity:"MED"});
+  if(score>=0.4&&score<0.7)                               f.push({code:"RF-07",label:"Medium fraud score — review required",severity:"MED"});
+  if(f.length===0)                                        f.push({code:"RF-00",label:"No rules triggered — transaction within normal parameters",severity:"LOW"});
+  return f;
 }
 
-const SEV_CFG = {
-  HIGH:{col:"#c0392b",bg:"#fdecea"},
-  MED: {col:"#b7770d",bg:"#fef3cd"},
-  LOW: {col:"#1a7a4a",bg:"#e8f7ee"},
-};
-
-// ── Transaction detail (real dataset fields only) ─────────────────────────────
-function TxnDetail({tx, showTruth}){
+function TxnDetail({tx,showTruth}){
   const tc=TRUTH_CFG[tx.groundTruth];
   const score=xgbScore(tx);
-  const flags=getRiskFlags(tx, score);
+  const flags=getRiskFlags(tx,score);
   const fields=[
-    {label:"Transaction amount (USD)",                    value:`${tx.amount.toFixed(2)}`},
+    {label:"Transaction amount (USD)",                    value:`$${tx.amount.toFixed(2)}`},
     {label:"Transaction channel (ProductCD)",             value:CHANNEL_LABELS[tx.product]||tx.product},
     {label:"Card network (card4)",                        value:tx.network.charAt(0).toUpperCase()+tx.network.slice(1)},
     {label:"Card type (card6)",                           value:tx.cardType.charAt(0).toUpperCase()+tx.cardType.slice(1)},
@@ -191,12 +182,8 @@ function TxnDetail({tx, showTruth}){
         </div>
         <Gauge score={score}/>
       </div>
-
-      {/* Triggered risk flags — mirrors rule-fired display in systems like FICO Falcon */}
       <div style={{borderTop:"1px solid #f0f0f0",paddingTop:12}}>
-        <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",marginBottom:8}}>
-          Triggered risk flags
-        </div>
+        <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",marginBottom:8}}>Triggered risk flags</div>
         <div style={{display:"flex",flexDirection:"column",gap:5}}>
           {flags.map((f,i)=>{
             const sc=SEV_CFG[f.severity];
@@ -215,7 +202,6 @@ function TxnDetail({tx, showTruth}){
   );
 }
 
-// ── SHAP ──────────────────────────────────────────────────────────────────────
 function ShapPanel({tx}){
   const entries=getShapEntries(tx);
   const maxV=Math.max(...entries.map(e=>Math.abs(e.shap)),0.01);
@@ -242,7 +228,6 @@ function ShapPanel({tx}){
   );
 }
 
-// ── LIME ──────────────────────────────────────────────────────────────────────
 function LimePanel({tx}){
   const entries=getLimeEntries(tx);
   const maxV=Math.max(...entries.map(e=>Math.abs(e.v)),0.01);
@@ -267,7 +252,6 @@ function LimePanel({tx}){
   );
 }
 
-// ── LLM ───────────────────────────────────────────────────────────────────────
 function LLMPanel({tx,score}){
   const [text,setText]=useState("");
   const [loading,setLoading]=useState(false);
@@ -304,21 +288,18 @@ function LLMPanel({tx,score}){
   );
 }
 
-// ── Counterfactual ────────────────────────────────────────────────────────────
-function CounterfactualPanel({tx,score}){
-  const pct=Math.round(score*100);
+function CounterfactualPanel({tx}){
   const shap=REAL_EXPLANATIONS[tx.id]?.shap??{};
-  // Only show features with positive SHAP (risk-increasing), sorted by impact
   const riskDrivers=Object.entries(shap).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
   const advice={
     TransactionAmt:{required:"Lower transaction amount",feasible:false,reason:"Cannot be changed retroactively"},
     ProductCD:     {required:"Different transaction channel",feasible:false,reason:"Cannot be changed retroactively"},
-    card4:         {required:"Verify card ownership with issuer",feasible:true, reason:"Analyst can contact card issuer"},
-    card6:         {required:"Verify card type matches account",feasible:true, reason:"Analyst can check account records"},
-    addr1:         {required:"Confirm billing address on file",feasible:true, reason:"Analyst can request cardholder verification"},
-    dist1:         {required:"Cardholder confirms travel or foreign purchase",feasible:true, reason:"Analyst can contact cardholder directly"},
+    card4:         {required:"Verify card ownership with issuer",feasible:true,reason:"Analyst can contact card issuer"},
+    card6:         {required:"Verify card type matches account",feasible:true,reason:"Analyst can check account records"},
+    addr1:         {required:"Confirm billing address on file",feasible:true,reason:"Analyst can request cardholder verification"},
+    dist1:         {required:"Cardholder confirms travel or foreign purchase",feasible:true,reason:"Analyst can contact cardholder directly"},
   };
-  if(!riskDrivers.length) return <div style={{fontSize:13,color:"#888",padding:"12px 0"}}>No risk-increasing features found for this transaction.</div>;
+  if(!riskDrivers.length)return<div style={{fontSize:13,color:"#888",padding:"12px 0"}}>No risk-increasing features found for this transaction.</div>;
   return(
     <div>
       <div style={{fontSize:12,color:"#888",marginBottom:12}}>Features currently increasing the fraud score, and what would need to change to reduce risk. Based on SHAP values from the trained model.</div>
@@ -341,9 +322,7 @@ function CounterfactualPanel({tx,score}){
                 <td style={{padding:"8px 10px",color:"#c0392b",fontWeight:600}}>+{v.toFixed(3)}</td>
                 <td style={{padding:"8px 10px",color:"#2563eb"}}>{a.required}</td>
                 <td style={{padding:"8px 10px"}}>
-                  <span style={{padding:"2px 8px",borderRadius:10,fontSize:11,fontWeight:600,background:a.feasible?"#dcfce7":"#f1f5f9",color:a.feasible?"#15803d":"#94a3b8"}}>
-                    {a.feasible?"✓ Yes":"✗ No"}
-                  </span>
+                  <span style={{padding:"2px 8px",borderRadius:10,fontSize:11,fontWeight:600,background:a.feasible?"#dcfce7":"#f1f5f9",color:a.feasible?"#15803d":"#94a3b8"}}>{a.feasible?"✓ Yes":"✗ No"}</span>
                   {a.reason&&<div style={{fontSize:10,color:"#94a3b8",marginTop:2}}>{a.reason}</div>}
                 </td>
               </tr>
@@ -355,7 +334,6 @@ function CounterfactualPanel({tx,score}){
   );
 }
 
-// ── Peer Cases ────────────────────────────────────────────────────────────────
 function PeersPanel({tx}){
   const others=ALL_TXN.filter(t=>t.id!==tx.id).map(t=>{
     let sim=0;
@@ -404,7 +382,6 @@ function PeersPanel({tx}){
   );
 }
 
-// ── MetricInput ───────────────────────────────────────────────────────────────
 function MetricInput({m,val,onChange,triageDecision}){
   switch(m.type){
     case "classification": return(
@@ -460,7 +437,6 @@ function MetricInput({m,val,onChange,triageDecision}){
   }
 }
 
-// ── EscalateEvalWidget ────────────────────────────────────────────────────────
 function EscalateEvalWidget({expTab,expTabStartTime,txId,saved,onSave,triageDecision}){
   const [open,setOpen]=useState(false);
   const [vals,setVals]=useState({});
@@ -495,7 +471,6 @@ function EscalateEvalWidget({expTab,expTabStartTime,txId,saved,onSave,triageDeci
   );
 }
 
-// ── EvalWidget (Task 1) ───────────────────────────────────────────────────────
 function EvalWidget({step,expTab,saved,onSave,txId}){
   const task=WORKFLOW.find(w=>w.id===step)||WORKFLOW[0];
   const metrics=TASK_METRICS[step]||[];
@@ -523,7 +498,6 @@ function EvalWidget({step,expTab,saved,onSave,txId}){
   );
 }
 
-// ── SingleNav ─────────────────────────────────────────────────────────────────
 function SingleNav({txns,selected,onSelect}){
   const idx=Math.min(selected,txns.length-1);
   const tx=txns[idx];if(!tx)return null;
@@ -548,7 +522,6 @@ const EXP_GROUPS=[
    tabs:[{id:"peers",label:"Case-Based Reasoning (CBR)"}]},
 ];
 
-// ── App ───────────────────────────────────────────────────────────────────────
 export default function App(){
   const [selected,setSelected]=useState(0);
   const [step,setStep]=useState("triage");
@@ -578,7 +551,6 @@ export default function App(){
     <div style={{fontFamily:"system-ui,sans-serif",padding:"1rem 0",maxWidth:1200,margin:"0 auto"}}>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
 
-      {/* Header */}
       <div style={{marginBottom:12,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
         <div style={{fontSize:20,fontWeight:700,color:"#1e293b"}}>Fraud Detection — XAI Study Dashboard</div>
         <button onClick={()=>setShowMeta(m=>!m)} style={{padding:"2px 8px",borderRadius:6,border:"1px solid #ddd",background:"#f9f9f9",color:"#bbb",fontSize:10,cursor:"pointer"}}>{showMeta?"hide":"···"}</button>
@@ -592,7 +564,6 @@ export default function App(){
         </div>
       </div>
 
-      {/* Legend — Task 1 only */}
       {isTriage&&<div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
         {Object.entries(TRUTH_CFG).map(([k,v])=>(
           <div key={k} style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:8,background:v.bg,border:`1px solid ${v.col}30`}}>
@@ -616,46 +587,46 @@ export default function App(){
             </div>
           ))}
         </div>
-          {isTriage&&<div style={{fontSize:15,fontWeight:500,color:"#334155",lineHeight:1.6,padding:"10px 14px",background:"#f9f9f9",borderRadius:6}}>Review the transaction details and fraud risk score below. Based only on this information, classify the alert and record your confidence. Do not proceed to explanations yet.</div>}
-          {!isTriage&&(
-            <div>
-              <div style={{fontSize:15,fontWeight:500,color:"#334155",lineHeight:1.6,padding:"10px 14px",background:"#f9f9f9",borderRadius:6,marginBottom:8}}>
-                Review all 5 explanation types for each of the 4 transactions. For each explanation, rate its clarity and completeness, and record whether it changed your initial classification.
-              </div>
-              <div style={{display:"flex",gap:6}}>
-                {task2Txns.map((t,i)=>{
-                  const isCurrent=txns[selected]?.id===t.id;
-                  const allRated=ALL_EXP_TABS.every(tab=>saved[`escalate-${t.id}-${tab}`]);
-                  return(
-                    <div key={t.id} onClick={()=>setSelected(i)} style={{flex:1,padding:"12px 8px",borderRadius:8,border:`2px solid ${isCurrent?"#7b5ea7":allRated?"#1a7a4a":"#e0e0e0"}`,background:isCurrent?"#f2eef9":allRated?"#f0fdf4":"#fafafa",cursor:"pointer",textAlign:"center"}}>
-                      <div style={{fontSize:15,fontWeight:700,color:isCurrent?"#7b5ea7":allRated?"#1a7a4a":"#555"}}>TXN {i+1}</div>
-                      {allRated&&<div style={{fontSize:11,color:"#1a7a4a",marginTop:4,fontWeight:600}}>✓ Done</div>}
-                    </div>
-                  );
-                })}
-              </div>
+        {isTriage&&(
+          <div style={{fontSize:15,fontWeight:500,color:"#334155",lineHeight:1.6,padding:"10px 14px",background:"#f9f9f9",borderRadius:6}}>
+            Review the transaction details and fraud risk score below. Based only on this information, classify the alert and record your confidence. Do not proceed to explanations yet.
+          </div>
+        )}
+        {!isTriage&&(
+          <div>
+            <div style={{fontSize:15,fontWeight:500,color:"#334155",lineHeight:1.6,padding:"10px 14px",background:"#f9f9f9",borderRadius:6,marginBottom:8}}>
+              Review all 5 explanation types for each of the 4 transactions. For each explanation, rate its clarity and completeness, and record whether it changed your initial classification.
             </div>
-          )}
-        </div>
+            <div style={{display:"flex",gap:6}}>
+              {task2Txns.map((t,i)=>{
+                const isCurrent=txns[selected]?.id===t.id;
+                const allRated=ALL_EXP_TABS.every(tab=>saved[`escalate-${t.id}-${tab}`]);
+                return(
+                  <div key={t.id} onClick={()=>setSelected(i)} style={{flex:1,padding:"12px 8px",borderRadius:8,border:`2px solid ${isCurrent?"#7b5ea7":allRated?"#1a7a4a":"#e0e0e0"}`,background:isCurrent?"#f2eef9":allRated?"#f0fdf4":"#fafafa",cursor:"pointer",textAlign:"center"}}>
+                    <div style={{fontSize:15,fontWeight:700,color:isCurrent?"#7b5ea7":allRated?"#1a7a4a":"#555"}}>TXN {i+1}</div>
+                    {allRated&&<div style={{fontSize:11,color:"#1a7a4a",marginTop:4,fontWeight:600}}>✓ Done</div>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Main layout */}
       <div style={{display:"grid",gridTemplateColumns:"240px 1fr",gap:12}}>
         <SingleNav txns={txns} selected={selected} onSelect={setSelected}/>
         <div>
-          {/* Transaction card */}
           <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"16px",marginBottom:12}}>
             <TxnDetail tx={tx} showTruth={!isTriage}/>
           </div>
 
-          {/* Task 1 */}
           {isTriage&&(
             <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"14px",marginBottom:12}}>
               <EvalWidget step={step} expTab={expTab} saved={saved} onSave={handleSave} txId={tx.id}/>
             </div>
           )}
 
-          {/* Task 2 */}
           {!isTriage&&(
             <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"14px",marginBottom:12}}>
               <div style={{fontSize:10,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".08em",marginBottom:10}}>Explanation view</div>
@@ -679,7 +650,7 @@ export default function App(){
                 {expTab==="shap"           &&<ShapPanel tx={tx}/>}
                 {expTab==="lime"           &&<LimePanel tx={tx}/>}
                 {expTab==="llm"            &&<LLMPanel key={tx.id} tx={tx} score={score}/>}
-                {expTab==="counterfactual" &&<CounterfactualPanel tx={tx} score={score}/>}
+                {expTab==="counterfactual" &&<CounterfactualPanel tx={tx}/>}
                 {expTab==="peers"          &&<PeersPanel tx={tx}/>}
               </div>
               <EscalateEvalWidget
