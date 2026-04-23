@@ -27,6 +27,7 @@ const FEAT_LABELS = {
 const CHANNEL_LABELS = { W:"Web purchase", C:"Card payment", H:"Home purchase", R:"Retail", S:"Service" };
 const TAB_ID_TO_LABEL = {shap:"SHAP",lime:"LIME",llm:"LLM",counterfactual:"Counterfactual",peers:"Similar Cases (CBR)"};
 const ALL_EXP_TABS = Object.values(TAB_ID_TO_LABEL);
+const EXP_TAB_IDS = ["shap","lime","llm","counterfactual","peers"];
 
 const TRUTH_CFG = {
   confirmed_fraud:{label:"Confirmed fraud",col:"#c0392b",bg:"#fdecea",icon:"⚠"},
@@ -385,43 +386,66 @@ function ClassifyWidget({txId,saved,onSave}){
   );
 }
 
-function ExpRatingWidget({txId,expTab,saved,onSave}){
+function ExpRatingWidget({txId, expTab, expTabId, saved, onSave, onNext, isLastTab}){
   const key=`exprating-${txId}-${expTab}`;
   const [clarity,setClarity]=useState(null);
   const [completeness,setCompleteness]=useState(null);
   useEffect(()=>{setClarity(null);setCompleteness(null);},[txId,expTab]);
-  if(saved[key])return(
-    <div style={{marginTop:12,padding:"8px 12px",background:"#f0fdf4",borderRadius:8,fontSize:12,color:"#166534"}}>
-      ✓ Rated: Clarity <strong>{saved[key].clarity}/5</strong> · Completeness <strong>{saved[key].completeness}/5</strong>
-    </div>
-  );
+
   const allDone=clarity&&completeness;
+  const alreadySaved=!!saved[key];
+
   return(
     <div style={{marginTop:12,padding:"12px 14px",background:"#f8fafc",borderRadius:8,border:"1px solid #e2e8f0"}}>
       <div style={{fontSize:11,fontWeight:600,color:"#475569",marginBottom:10}}>Rate this explanation — {expTab}</div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:10}}>
-        <div>
-          <div style={{fontSize:11,color:"#64748b",marginBottom:5}}>Clarity (1–5)</div>
-          <div style={{display:"flex",gap:4,alignItems:"center"}}>
-            <span style={{fontSize:9,color:"#bbb"}}>Unclear</span>
-            {[1,2,3,4,5].map(n=>(<button key={n} onClick={()=>setClarity(n)} style={{width:28,height:28,borderRadius:5,border:`1px solid ${clarity===n?"#2980b9":"#ddd"}`,background:clarity===n?"#e8f0fe":"#fff",color:clarity===n?"#2980b9":"#888",fontSize:12,cursor:"pointer"}}>{n}</button>))}
-            <span style={{fontSize:9,color:"#bbb"}}>Clear</span>
+
+      {alreadySaved ? (
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+          <div style={{fontSize:12,color:"#166534",fontWeight:500}}>
+            ✓ Rated: Clarity <strong>{saved[key].clarity}/5</strong> · Completeness <strong>{saved[key].completeness}/5</strong>
           </div>
+          {!isLastTab && (
+            <button
+              onClick={onNext}
+              style={{display:"flex",alignItems:"center",gap:6,padding:"7px 16px",borderRadius:8,border:"1px solid #2980b9",background:"#e8f0fe",color:"#2980b9",fontSize:12,fontWeight:600,cursor:"pointer"}}
+            >
+              Next explanation <span style={{fontSize:15,lineHeight:1}}>→</span>
+            </button>
+          )}
+          {isLastTab && (
+            <span style={{fontSize:11,color:"#94a3b8",fontStyle:"italic"}}>All explanations rated ✓</span>
+          )}
         </div>
-        <div>
-          <div style={{fontSize:11,color:"#64748b",marginBottom:5}}>Completeness (1–5)</div>
-          <div style={{display:"flex",gap:4,alignItems:"center"}}>
-            <span style={{fontSize:9,color:"#bbb"}}>Incomplete</span>
-            {[1,2,3,4,5].map(n=>(<button key={n} onClick={()=>setCompleteness(n)} style={{width:28,height:28,borderRadius:5,border:`1px solid ${completeness===n?"#2980b9":"#ddd"}`,background:completeness===n?"#e8f0fe":"#fff",color:completeness===n?"#2980b9":"#888",fontSize:12,cursor:"pointer"}}>{n}</button>))}
-            <span style={{fontSize:9,color:"#bbb"}}>Complete</span>
+      ) : (
+        <>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:10}}>
+            <div>
+              <div style={{fontSize:11,color:"#64748b",marginBottom:5}}>Clarity (1–5)</div>
+              <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                <span style={{fontSize:9,color:"#bbb"}}>Unclear</span>
+                {[1,2,3,4,5].map(n=>(<button key={n} onClick={()=>setClarity(n)} style={{width:28,height:28,borderRadius:5,border:`1px solid ${clarity===n?"#2980b9":"#ddd"}`,background:clarity===n?"#e8f0fe":"#fff",color:clarity===n?"#2980b9":"#888",fontSize:12,cursor:"pointer"}}>{n}</button>))}
+                <span style={{fontSize:9,color:"#bbb"}}>Clear</span>
+              </div>
+            </div>
+            <div>
+              <div style={{fontSize:11,color:"#64748b",marginBottom:5}}>Completeness (1–5)</div>
+              <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                <span style={{fontSize:9,color:"#bbb"}}>Incomplete</span>
+                {[1,2,3,4,5].map(n=>(<button key={n} onClick={()=>setCompleteness(n)} style={{width:28,height:28,borderRadius:5,border:`1px solid ${completeness===n?"#2980b9":"#ddd"}`,background:completeness===n?"#e8f0fe":"#fff",color:completeness===n?"#2980b9":"#888",fontSize:12,cursor:"pointer"}}>{n}</button>))}
+                <span style={{fontSize:9,color:"#bbb"}}>Complete</span>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-      <button onClick={()=>onSave(key,{clarity,completeness,exp:expTab,transaction_id:txId})}
-        disabled={!allDone}
-        style={{padding:"6px 16px",borderRadius:7,border:`1px solid ${allDone?"#2980b9":"#ccc"}`,background:allDone?"#e8f0fe":"#f5f5f5",color:allDone?"#2980b9":"#aaa",fontSize:12,cursor:allDone?"pointer":"default",fontWeight:500}}>
-        Save rating →
-      </button>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <button onClick={()=>onSave(key,{clarity,completeness,exp:expTab,transaction_id:txId})}
+              disabled={!allDone}
+              style={{padding:"6px 16px",borderRadius:7,border:`1px solid ${allDone?"#2980b9":"#ccc"}`,background:allDone?"#e8f0fe":"#f5f5f5",color:allDone?"#2980b9":"#aaa",fontSize:12,cursor:allDone?"pointer":"default",fontWeight:500}}>
+              Save rating →
+            </button>
+            {!allDone&&<span style={{fontSize:11,color:"#bbb"}}>Rate both dimensions to save</span>}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -491,6 +515,12 @@ export default function App(){
   const initialClass=saved[classifyKey]?.classification;
   const allExpRated=ALL_EXP_TABS.every(tab=>saved[`exprating-${tx.id}-${tab}`]);
   const ratedCount=ALL_EXP_TABS.filter(tab=>saved[`exprating-${tx.id}-${tab}`]).length;
+
+  const currentTabIdx=EXP_TAB_IDS.indexOf(expTab);
+  const isLastTab=currentTabIdx===EXP_TAB_IDS.length-1;
+  const goToNextTab=()=>{
+    if(!isLastTab) setExpTab(EXP_TAB_IDS[currentTabIdx+1]);
+  };
 
   const handleSave=(k,d)=>{
     setSaved(s=>({...s,[k]:d}));
@@ -580,7 +610,15 @@ export default function App(){
               {expTab==="llm"            &&<LLMPanel key={tx.id} tx={tx} score={score}/>}
               {expTab==="counterfactual" &&<CounterfactualPanel tx={tx}/>}
               {expTab==="peers"          &&<PeersPanel tx={tx}/>}
-              <ExpRatingWidget txId={tx.id} expTab={TAB_ID_TO_LABEL[expTab]||expTab} saved={saved} onSave={handleSave}/>
+              <ExpRatingWidget
+                txId={tx.id}
+                expTab={TAB_ID_TO_LABEL[expTab]||expTab}
+                expTabId={expTab}
+                saved={saved}
+                onSave={handleSave}
+                onNext={goToNextTab}
+                isLastTab={isLastTab}
+              />
             </div>
           </div>
 
