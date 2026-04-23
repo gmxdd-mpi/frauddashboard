@@ -409,7 +409,7 @@ function SummaryWidget({txId,initialClass,saved,onSave}){
       <div style={{fontSize:12,color:"#166534",fontWeight:600}}>✓ Summary evaluation recorded for this transaction</div>
     </div>
   );
-  const allDone=reclassify&&bestExp&&clarity&&completeness;
+  const allDone=reclassify&&bestExp;
   const tc=initialClass?TRUTH_CFG[initialClass]:null;
   return(
     <div style={{padding:"14px",background:"#f2eef9",borderRadius:8,border:"1px solid #ddd6fe",marginTop:12}}>
@@ -433,25 +433,7 @@ function SummaryWidget({txId,initialClass,saved,onSave}){
           ))}
         </div>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
-        <div>
-          <div style={{fontSize:11,fontWeight:500,color:"#374151",marginBottom:6}}>Overall clarity of explanations (1–5)</div>
-          <div style={{display:"flex",gap:4,alignItems:"center"}}>
-            <span style={{fontSize:9,color:"#bbb"}}>Unclear</span>
-            {[1,2,3,4,5].map(n=>(<button key={n} onClick={()=>setClarity(n)} style={{width:28,height:28,borderRadius:5,border:`1px solid ${clarity===n?"#7b5ea7":"#ddd"}`,background:clarity===n?"#ede9fe":"#fff",color:clarity===n?"#7b5ea7":"#888",fontSize:12,cursor:"pointer"}}>{n}</button>))}
-            <span style={{fontSize:9,color:"#bbb"}}>Clear</span>
-          </div>
-        </div>
-        <div>
-          <div style={{fontSize:11,fontWeight:500,color:"#374151",marginBottom:6}}>Overall completeness of explanations (1–5)</div>
-          <div style={{display:"flex",gap:4,alignItems:"center"}}>
-            <span style={{fontSize:9,color:"#bbb"}}>Incomplete</span>
-            {[1,2,3,4,5].map(n=>(<button key={n} onClick={()=>setCompleteness(n)} style={{width:28,height:28,borderRadius:5,border:`1px solid ${completeness===n?"#7b5ea7":"#ddd"}`,background:completeness===n?"#ede9fe":"#fff",color:completeness===n?"#7b5ea7":"#888",fontSize:12,cursor:"pointer"}}>{n}</button>))}
-            <span style={{fontSize:9,color:"#bbb"}}>Complete</span>
-          </div>
-        </div>
-      </div>
-      <button onClick={()=>onSave(key,{reclassification:reclassify,most_helpful_explanation:bestExp,overall_clarity:clarity,overall_completeness:completeness,transaction_id:txId,initial_classification:initialClass})}
+      <button onClick={()=>onSave(key,{reclassification:reclassify,most_helpful_explanation:bestExp,transaction_id:txId,initial_classification:initialClass})}
         disabled={!allDone}
         style={{padding:"8px 20px",borderRadius:8,border:`1px solid ${allDone?"#7b5ea7":"#ccc"}`,background:allDone?"#7b5ea7":"#f5f5f5",color:allDone?"#fff":"#aaa",fontSize:12,cursor:allDone?"pointer":"default",fontWeight:600}}>
         Save & complete this transaction →
@@ -461,7 +443,47 @@ function SummaryWidget({txId,initialClass,saved,onSave}){
   );
 }
 
-// ── Explanation tabs ──────────────────────────────────────────────────────────
+// ── Per-explanation rating (shown below each explanation tab) ────────────────
+function ExpRatingWidget({txId,expTab,saved,onSave}){
+  const key=`exprating-${txId}-${expTab}`;
+  const [clarity,setClarity]=useState(null);
+  const [completeness,setCompleteness]=useState(null);
+  useEffect(()=>{setClarity(null);setCompleteness(null);},[txId,expTab]);
+  if(saved[key])return(
+    <div style={{marginTop:12,padding:"8px 12px",background:"#f0fdf4",borderRadius:8,fontSize:12,color:"#166534"}}>
+      ✓ Rated: Clarity <strong>{saved[key].clarity}/5</strong> · Completeness <strong>{saved[key].completeness}/5</strong>
+    </div>
+  );
+  const allDone=clarity&&completeness;
+  return(
+    <div style={{marginTop:12,padding:"12px 14px",background:"#f8fafc",borderRadius:8,border:"1px solid #e2e8f0"}}>
+      <div style={{fontSize:11,fontWeight:600,color:"#475569",marginBottom:10}}>Rate this explanation — {expTab}</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:10}}>
+        <div>
+          <div style={{fontSize:11,color:"#64748b",marginBottom:5}}>Clarity (1–5)</div>
+          <div style={{display:"flex",gap:4,alignItems:"center"}}>
+            <span style={{fontSize:9,color:"#bbb"}}>Unclear</span>
+            {[1,2,3,4,5].map(n=>(<button key={n} onClick={()=>setClarity(n)} style={{width:28,height:28,borderRadius:5,border:`1px solid ${clarity===n?"#2980b9":"#ddd"}`,background:clarity===n?"#e8f0fe":"#fff",color:clarity===n?"#2980b9":"#888",fontSize:12,cursor:"pointer"}}>{n}</button>))}
+            <span style={{fontSize:9,color:"#bbb"}}>Clear</span>
+          </div>
+        </div>
+        <div>
+          <div style={{fontSize:11,color:"#64748b",marginBottom:5}}>Completeness (1–5)</div>
+          <div style={{display:"flex",gap:4,alignItems:"center"}}>
+            <span style={{fontSize:9,color:"#bbb"}}>Incomplete</span>
+            {[1,2,3,4,5].map(n=>(<button key={n} onClick={()=>setCompleteness(n)} style={{width:28,height:28,borderRadius:5,border:`1px solid ${completeness===n?"#2980b9":"#ddd"}`,background:completeness===n?"#e8f0fe":"#fff",color:completeness===n?"#2980b9":"#888",fontSize:12,cursor:"pointer"}}>{n}</button>))}
+            <span style={{fontSize:9,color:"#bbb"}}>Complete</span>
+          </div>
+        </div>
+      </div>
+      <button onClick={()=>onSave(key,{clarity,completeness,exp:expTab,transaction_id:txId})}
+        disabled={!allDone}
+        style={{padding:"6px 16px",borderRadius:7,border:`1px solid ${allDone?"#2980b9":"#ccc"}`,background:allDone?"#e8f0fe":"#f5f5f5",color:allDone?"#2980b9":"#aaa",fontSize:12,cursor:allDone?"pointer":"default",fontWeight:500}}>
+        Save rating →
+      </button>
+    </div>
+  );
+}
 const EXP_GROUPS=[
   {label:"Post-hoc explainability",col:"#2980b9",bg:"#e8f0fe",desc:"Applied after model prediction",
    tabs:[{id:"shap",label:"SHAP"},{id:"lime",label:"LIME"},{id:"llm",label:"LLM"},{id:"counterfactual",label:"Counterfactual"}]},
@@ -582,6 +604,7 @@ export default function App(){
               {expTab==="llm"            &&<LLMPanel key={tx.id} tx={tx} score={score}/>}
               {expTab==="counterfactual" &&<CounterfactualPanel tx={tx}/>}
               {expTab==="peers"          &&<PeersPanel tx={tx}/>}
+              <ExpRatingWidget txId={tx.id} expTab={TAB_ID_TO_LABEL[expTab]||expTab} saved={saved} onSave={handleSave}/>
             </div>
           </div>
 
