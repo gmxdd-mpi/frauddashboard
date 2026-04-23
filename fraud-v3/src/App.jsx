@@ -50,7 +50,7 @@ const FEAT_LABELS = {
   dist1:          "Distance: billing to transaction location, km (dist1)",
 };
 const CHANNEL_LABELS = { W:"Web purchase", C:"Card payment", H:"Home purchase", R:"Retail", S:"Service" };
-const TAB_ID_TO_LABEL = {shap:"SHAP",lime:"LIME",llm:"LLM",counterfactual:"Counterfactual",peers:"Peer Cases"};
+const TAB_ID_TO_LABEL = {shap:"SHAP",lime:"LIME",llm:"LLM",counterfactual:"Counterfactual",peers:"Case-Based Reasoning (CBR)"};
 const ALL_EXP_TABS = Object.values(TAB_ID_TO_LABEL);
 
 const TRUTH_CFG = {
@@ -545,7 +545,7 @@ const EXP_GROUPS=[
   {label:"Post-hoc explainability",col:"#2980b9",bg:"#e8f0fe",desc:"Applied after model prediction",
    tabs:[{id:"shap",label:"SHAP"},{id:"lime",label:"LIME"},{id:"llm",label:"LLM"},{id:"counterfactual",label:"Counterfactual"}]},
   {label:"Case-based reasoning",col:"#16a085",bg:"#e8f8f5",desc:"Comparison with historical cases",
-   tabs:[{id:"peers",label:"Peer Cases"}]},
+   tabs:[{id:"peers",label:"Case-Based Reasoning (CBR)"}]},
 ];
 
 // ── App ───────────────────────────────────────────────────────────────────────
@@ -616,20 +616,20 @@ export default function App(){
             </div>
           ))}
         </div>
-        <div style={{padding:"10px 14px",background:"#f9f9f9",borderRadius:6,fontSize:13,color:"#555",lineHeight:1.6}}>
-          {isTriage&&"Review the transaction details and fraud risk score below. Based only on this information, classify the alert and record your confidence. Do not proceed to explanations yet."}
+          {isTriage&&<div style={{fontSize:15,fontWeight:500,color:"#334155",lineHeight:1.6,padding:"10px 14px",background:"#f9f9f9",borderRadius:6}}>Review the transaction details and fraud risk score below. Based only on this information, classify the alert and record your confidence. Do not proceed to explanations yet.</div>}
           {!isTriage&&(
             <div>
-              <div style={{fontWeight:500,marginBottom:8}}>Review all 5 explanation types for each of the 4 transactions. For each explanation, rate its clarity and completeness, and record whether it changed your initial classification.</div>
+              <div style={{fontSize:15,fontWeight:500,color:"#334155",lineHeight:1.6,padding:"10px 14px",background:"#f9f9f9",borderRadius:6,marginBottom:8}}>
+                Review all 5 explanation types for each of the 4 transactions. For each explanation, rate its clarity and completeness, and record whether it changed your initial classification.
+              </div>
               <div style={{display:"flex",gap:6}}>
                 {task2Txns.map((t,i)=>{
                   const isCurrent=txns[selected]?.id===t.id;
-                  const ratedCount=ALL_EXP_TABS.filter(tab=>saved[`escalate-${t.id}-${tab}`]).length;
+                  const allRated=ALL_EXP_TABS.every(tab=>saved[`escalate-${t.id}-${tab}`]);
                   return(
-                    <div key={t.id} onClick={()=>setSelected(i)} style={{flex:1,padding:"8px",borderRadius:8,border:`2px solid ${isCurrent?"#7b5ea7":"#e0e0e0"}`,background:isCurrent?"#f2eef9":"#fafafa",cursor:"pointer",textAlign:"center"}}>
-                      <div style={{fontSize:11,fontWeight:600,color:isCurrent?"#7b5ea7":"#555"}}>TXN {i+1}</div>
-                      <div style={{fontSize:10,color:"#aaa",marginBottom:3}}>{t.id}</div>
-                      <div style={{fontSize:10,color:ratedCount===5?"#1a7a4a":isCurrent?"#7b5ea7":"#aaa",fontWeight:500}}>{ratedCount}/5{ratedCount===5?" ✓":""}</div>
+                    <div key={t.id} onClick={()=>setSelected(i)} style={{flex:1,padding:"12px 8px",borderRadius:8,border:`2px solid ${isCurrent?"#7b5ea7":allRated?"#1a7a4a":"#e0e0e0"}`,background:isCurrent?"#f2eef9":allRated?"#f0fdf4":"#fafafa",cursor:"pointer",textAlign:"center"}}>
+                      <div style={{fontSize:15,fontWeight:700,color:isCurrent?"#7b5ea7":allRated?"#1a7a4a":"#555"}}>TXN {i+1}</div>
+                      {allRated&&<div style={{fontSize:11,color:"#1a7a4a",marginTop:4,fontWeight:600}}>✓ Done</div>}
                     </div>
                   );
                 })}
