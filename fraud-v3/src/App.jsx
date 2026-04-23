@@ -138,34 +138,79 @@ function AttrBar({v,maxV=2.5}){
   );
 }
 
+// ── Risk flags (mirrors rule-fired signals in real systems like FICO Falcon) ──
+function getRiskFlags(tx, score) {
+  const flags = [];
+  if (score >= 0.7)             flags.push({code:"RF-01", label:"High fraud score",                    severity:"HIGH"});
+  if (tx.amount > 150)          flags.push({code:"RF-02", label:"Transaction amount above threshold",   severity:"HIGH"});
+  if (tx.dist !== null && tx.dist > 100) flags.push({code:"RF-03", label:"Suspicious transaction distance",  severity:"HIGH"});
+  if (tx.dist !== null && tx.dist > 20 && tx.dist <= 100) flags.push({code:"RF-03", label:"Elevated transaction distance", severity:"MED"});
+  if (tx.addr === null)         flags.push({code:"RF-04", label:"Billing address not confirmed",        severity:"MED"});
+  if (tx.product === "C" && score > 0.3) flags.push({code:"RF-05", label:"Card payment — elevated risk pattern", severity:"MED"});
+  if (tx.product === "W" && tx.dist !== null && tx.dist > 5) flags.push({code:"RF-06", label:"Web purchase with distance anomaly", severity:"MED"});
+  if (score >= 0.4 && score < 0.7) flags.push({code:"RF-07", label:"Medium fraud score — review required", severity:"MED"});
+  if (flags.length === 0)       flags.push({code:"RF-00", label:"No rules triggered — transaction within normal parameters", severity:"LOW"});
+  return flags;
+}
+
+const SEV_CFG = {
+  HIGH:{col:"#c0392b",bg:"#fdecea"},
+  MED: {col:"#b7770d",bg:"#fef3cd"},
+  LOW: {col:"#1a7a4a",bg:"#e8f7ee"},
+};
+
 // ── Transaction detail (real dataset fields only) ─────────────────────────────
 function TxnDetail({tx, showTruth}){
   const tc=TRUTH_CFG[tx.groundTruth];
+  const score=xgbScore(tx);
+  const flags=getRiskFlags(tx, score);
   const fields=[
-    {label:"Transaction amount (USD)", value:`$${tx.amount.toFixed(2)}`},
-    {label:"Transaction channel (ProductCD)", value:CHANNEL_LABELS[tx.product]||tx.product},
-    {label:"Card network (card4)", value:tx.network.charAt(0).toUpperCase()+tx.network.slice(1)},
-    {label:"Card type (card6)", value:tx.cardType.charAt(0).toUpperCase()+tx.cardType.slice(1)},
-    {label:"Billing region code (addr1)", value:tx.addr??'Not provided'},
+    {label:"Transaction amount (USD)",                    value:`${tx.amount.toFixed(2)}`},
+    {label:"Transaction channel (ProductCD)",             value:CHANNEL_LABELS[tx.product]||tx.product},
+    {label:"Card network (card4)",                        value:tx.network.charAt(0).toUpperCase()+tx.network.slice(1)},
+    {label:"Card type (card6)",                           value:tx.cardType.charAt(0).toUpperCase()+tx.cardType.slice(1)},
+    {label:"Billing region code (addr1)",                 value:tx.addr??'Not provided'},
     {label:"Distance: billing → transaction, km (dist1)", value:tx.dist!==null?`${tx.dist} km`:'Not available'},
   ];
   return(
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:16}}>
-      <div style={{flex:1}}>
-        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-          <div style={{fontSize:15,fontWeight:600,color:"#1e293b"}}>Transaction {tx.id}</div>
-          {showTruth&&<Badge label={`${tc.icon} ${tc.label}`} col={tc.col} bg={tc.bg} sz={12}/>}
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:16,marginBottom:14}}>
+        <div style={{flex:1}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+            <div style={{fontSize:15,fontWeight:600,color:"#1e293b"}}>Transaction {tx.id}</div>
+            {showTruth&&<Badge label={`${tc.icon} ${tc.label}`} col={tc.col} bg={tc.bg} sz={12}/>}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px 16px"}}>
+            {fields.map(f=>(
+              <div key={f.label} style={{padding:"6px 10px",background:"#f8fafc",borderRadius:6,borderLeft:"3px solid #e2e8f0"}}>
+                <div style={{fontSize:10,color:"#94a3b8",fontWeight:600,marginBottom:2}}>{f.label}</div>
+                <div style={{fontSize:13,color:"#1e293b",fontWeight:500}}>{f.value}</div>
+              </div>
+            ))}
+          </div>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px 16px"}}>
-          {fields.map(f=>(
-            <div key={f.label} style={{padding:"6px 10px",background:"#f8fafc",borderRadius:6,borderLeft:"3px solid #e2e8f0"}}>
-              <div style={{fontSize:10,color:"#94a3b8",fontWeight:600,marginBottom:2}}>{f.label}</div>
-              <div style={{fontSize:13,color:"#1e293b",fontWeight:500}}>{f.value}</div>
-            </div>
-          ))}
+        <Gauge score={score}/>
+      </div>
+
+      {/* Triggered risk flags — mirrors rule-fired display in systems like FICO Falcon */}
+      <div style={{borderTop:"1px solid #f0f0f0",paddingTop:12}}>
+        <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",marginBottom:8}}>
+          Triggered risk flags
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:5}}>
+          {flags.map((f,i)=>{
+            const sc=SEV_CFG[f.severity];
+            return(
+              <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",background:sc.bg,borderRadius:6,border:`1px solid ${sc.col}22`}}>
+                <span style={{fontSize:10,fontFamily:"monospace",fontWeight:700,color:sc.col,minWidth:42}}>{f.code}</span>
+                <span style={{width:1,height:14,background:sc.col,opacity:0.3,flexShrink:0}}/>
+                <span style={{fontSize:12,color:"#1e293b",flex:1}}>{f.label}</span>
+                <span style={{fontSize:10,fontWeight:700,color:sc.col,padding:"1px 7px",borderRadius:8,background:"#fff",border:`1px solid ${sc.col}44`}}>{f.severity}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
-      <Gauge score={xgbScore(tx)}/>
     </div>
   );
 }
