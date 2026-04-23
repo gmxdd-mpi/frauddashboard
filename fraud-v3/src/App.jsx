@@ -22,10 +22,10 @@ const FEAT_LABELS = {
   card4:"Card network (card4)",
   card6:"Card type (card6)",
   addr1:"Billing region code (addr1)",
-  dist1:"Distance: billing → transaction, km (dist1)",
+  dist1:"Distance: billing to transaction, km (dist1)",
 };
 const CHANNEL_LABELS = { W:"Web purchase", C:"Card payment", H:"Home purchase", R:"Retail", S:"Service" };
-const TAB_ID_TO_LABEL = {shap:"SHAP",lime:"LIME",llm:"LLM",counterfactual:"Counterfactual",peers:"Case-Based Reasoning (CBR)"};
+const TAB_ID_TO_LABEL = {shap:"SHAP",lime:"LIME",llm:"LLM",counterfactual:"Counterfactual",peers:"Similar Cases (CBR)"};
 const ALL_EXP_TABS = Object.values(TAB_ID_TO_LABEL);
 
 const TRUTH_CFG = {
@@ -95,7 +95,6 @@ function Gauge({score}){
   );
 }
 
-// ── SHAP horizontal bars ──────────────────────────────────────────────────────
 function ShapPanel({tx}){
   const entries=getShapEntries(tx);
   const maxV=Math.max(...entries.map(e=>Math.abs(e.shap)),0.01);
@@ -119,16 +118,7 @@ function ShapPanel({tx}){
             </div>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <div style={{flex:1,height:18,background:"#e2e8f0",borderRadius:4,overflow:"hidden",position:"relative"}}>
-                <div style={{
-                  position:"absolute",
-                  left:isPos?"50%":"auto",
-                  right:isPos?"auto":"50%",
-                  width:`${pct/2}%`,
-                  height:"100%",
-                  background:isPos?"#c0392b":"#2563eb",
-                  opacity:0.8,
-                  borderRadius:isPos?"0 4px 4px 0":"4px 0 0 4px"
-                }}/>
+                <div style={{position:"absolute",left:isPos?"50%":"auto",right:isPos?"auto":"50%",width:`${pct/2}%`,height:"100%",background:isPos?"#c0392b":"#2563eb",opacity:0.8,borderRadius:isPos?"0 4px 4px 0":"4px 0 0 4px"}}/>
                 <div style={{position:"absolute",left:"50%",top:0,width:1,height:"100%",background:"#94a3b8"}}/>
               </div>
               <span style={{fontSize:11,fontWeight:700,color:isPos?"#c0392b":"#2563eb",minWidth:54,textAlign:"right"}}>{isPos?"+":""}{e.shap.toFixed(3)}</span>
@@ -141,14 +131,13 @@ function ShapPanel({tx}){
   );
 }
 
-// ── LIME bar chart ────────────────────────────────────────────────────────────
 function LimePanel({tx}){
   const entries=getLimeEntries(tx);
   const maxV=Math.max(...entries.map(e=>Math.abs(e.v)),0.01);
   return(
     <div>
       <div style={{background:"#f0fdf4",borderRadius:8,padding:"10px 14px",marginBottom:12,fontSize:12,color:"#166534",lineHeight:1.6}}>
-        <strong>Condition-based breakdown.</strong> Rather than individual data points, this view shows which <em>conditions</em> about the transaction were most telling — for example, whether the amount fell above or below a typical threshold. Each condition is weighted by how much it shifted the fraud score locally for this specific alert.
+        <strong>Condition-based breakdown.</strong> Rather than individual data points, this view shows which conditions about the transaction were most telling — for example, whether the amount fell above or below a typical threshold. Each condition is weighted by how much it shifted the fraud score for this specific alert.
       </div>
       <div style={{display:"flex",gap:16,fontSize:11,color:"#888",marginBottom:10}}>
         <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:12,height:10,borderRadius:2,background:"#c0392b",display:"inline-block"}}/>Condition increases risk</span>
@@ -173,7 +162,6 @@ function LimePanel({tx}){
   );
 }
 
-// ── LLM ──────────────────────────────────────────────────────────────────────
 function LLMPanel({tx,score}){
   const [text,setText]=useState("");const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");const [done,setDone]=useState(false);
@@ -209,7 +197,6 @@ function LLMPanel({tx,score}){
   );
 }
 
-// ── Counterfactual ────────────────────────────────────────────────────────────
 function CounterfactualPanel({tx}){
   const shap=REAL_EXPLANATIONS[tx.id]?.shap??{};
   const riskDrivers=Object.entries(shap).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
@@ -225,7 +212,7 @@ function CounterfactualPanel({tx}){
   return(
     <div>
       <div style={{background:"#eff6ff",borderRadius:8,padding:"10px 14px",marginBottom:12,fontSize:12,color:"#1e40af",lineHeight:1.6}}>
-        <strong>What-if analysis.</strong> This view asks: "If this transaction had different characteristics, would it still be flagged?" It identifies which risk factors could realistically be verified or disputed — helping you decide whether to escalate, block, or approve.
+        <strong>What-if analysis.</strong> This view asks: if this transaction had different characteristics, would it still be flagged? It identifies which risk factors could realistically be verified or disputed — helping you decide whether to escalate, block, or approve.
       </div>
       <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
         <thead>
@@ -258,7 +245,6 @@ function CounterfactualPanel({tx}){
   );
 }
 
-// ── CBR ───────────────────────────────────────────────────────────────────────
 function PeersPanel({tx}){
   const others=ALL_TXN.filter(t=>t.id!==tx.id).map(t=>{
     let sim=0;
@@ -305,7 +291,6 @@ function PeersPanel({tx}){
   );
 }
 
-// ── Left panel: transaction details ──────────────────────────────────────────
 function TxnPanel({tx}){
   const score=xgbScore(tx);
   const flags=getRiskFlags(tx,score);
@@ -318,7 +303,7 @@ function TxnPanel({tx}){
     {label:"Distance (dist1)",value:tx.dist!==null?`${tx.dist} km`:'Not available'},
   ];
   return(
-    <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"16px",height:"100%"}}>
+    <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"16px"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
         <div>
           <div style={{fontSize:10,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".08em",marginBottom:4}}>Transaction ID</div>
@@ -351,18 +336,17 @@ function TxnPanel({tx}){
   );
 }
 
-// ── Classification widget ─────────────────────────────────────────────────────
 function ClassifyWidget({txId,saved,onSave}){
   const key=`classify-${txId}`;
   const [cls,setCls]=useState(null);
   const [conf,setConf]=useState(null);
   const [start]=useState(Date.now());
   useEffect(()=>{setCls(null);setConf(null);},[txId]);
-  if(saved[key]) return(
+  if(saved[key])return(
     <div style={{padding:"12px 14px",background:"#f0fdf4",borderRadius:8,border:"1px solid #bbf7d0"}}>
       <div style={{fontSize:12,color:"#166534",fontWeight:600,marginBottom:4}}>✓ Initial classification recorded</div>
       <div style={{fontSize:11,color:"#166534"}}>
-        Your classification: <strong>{TRUTH_CFG[saved[key].classification]?.label||saved[key].classification}</strong> · Confidence: <strong>{saved[key].confidence}/7</strong>
+        Classification: <strong>{TRUTH_CFG[saved[key].classification]?.label||saved[key].classification}</strong> · Confidence: <strong>{saved[key].confidence}/7</strong>
       </div>
     </div>
   );
@@ -394,61 +378,13 @@ function ClassifyWidget({txId,saved,onSave}){
       <button onClick={()=>onSave(key,{classification:cls,confidence:conf,latency_s:Math.round((Date.now()-start)/1000),transaction_id:txId})}
         disabled={!allDone}
         style={{padding:"8px 20px",borderRadius:8,border:`1px solid ${allDone?"#2980b9":"#ccc"}`,background:allDone?"#2980b9":"#f5f5f5",color:allDone?"#fff":"#aaa",fontSize:12,cursor:allDone?"pointer":"default",fontWeight:600}}>
-        Confirm & unlock explanations →
+        Confirm &amp; unlock explanations →
       </button>
       {!allDone&&<span style={{fontSize:11,color:"#bbb",marginLeft:10}}>Complete both fields to continue</span>}
     </div>
   );
 }
 
-// ── Summary eval (once per transaction, after exploring explanations) ─────────
-function SummaryWidget({txId,initialClass,saved,onSave}){
-  const key=`summary-${txId}`;
-  const [reclassify,setReclassify]=useState(null);
-  const [bestExp,setBestExp]=useState(null);
-  const [clarity,setClarity]=useState(null);
-  const [completeness,setCompleteness]=useState(null);
-  useEffect(()=>{setReclassify(null);setBestExp(null);setClarity(null);setCompleteness(null);},[txId]);
-  if(saved[key])return(
-    <div style={{padding:"12px 14px",background:"#f0fdf4",borderRadius:8,border:"1px solid #bbf7d0"}}>
-      <div style={{fontSize:12,color:"#166534",fontWeight:600}}>✓ Summary evaluation recorded for this transaction</div>
-    </div>
-  );
-  const allDone=reclassify&&bestExp;
-  const tc=initialClass?TRUTH_CFG[initialClass]:null;
-  return(
-    <div style={{padding:"14px",background:"#f2eef9",borderRadius:8,border:"1px solid #ddd6fe",marginTop:12}}>
-      <div style={{fontSize:13,fontWeight:600,color:"#5b21b6",marginBottom:12}}>Step 3 — Reflect on the explanations</div>
-      {tc&&<div style={{fontSize:11,color:"#64748b",marginBottom:12}}>Your initial classification: <Badge label={`${tc.icon} ${tc.label}`} col={tc.col} bg={tc.bg}/></div>}
-      <div style={{marginBottom:12}}>
-        <div style={{fontSize:11,fontWeight:500,color:"#374151",marginBottom:6}}>Has your classification changed after reviewing the explanations?</div>
-        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-          {[{key:"no_change",label:"No change",col:"#475569",bg:"#f1f5f9",icon:"→"},{key:"confirmed_fraud",label:"Confirmed fraud",col:"#c0392b",bg:"#fdecea",icon:"⚠"},{key:"suspected",label:"Suspected fraud",col:"#8e44ad",bg:"#f5eeff",icon:"?"},{key:"legitimate",label:"Legitimate",col:"#1a7a4a",bg:"#e8f7ee",icon:"✓"}].map(o=>(
-            <button key={o.key} onClick={()=>setReclassify(o.key)} style={{padding:"6px 12px",borderRadius:10,border:`2px solid ${reclassify===o.key?o.col:"#ddd"}`,background:reclassify===o.key?o.bg:"#fff",color:reclassify===o.key?o.col:"#888",fontSize:12,fontWeight:reclassify===o.key?600:400,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
-              <span>{o.icon}</span>{o.label}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div style={{marginBottom:12}}>
-        <div style={{fontSize:11,fontWeight:500,color:"#374151",marginBottom:6}}>Which explanation type was most helpful for your decision?</div>
-        <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-          {ALL_EXP_TABS.map(t=>(
-            <button key={t} onClick={()=>setBestExp(t)} style={{padding:"5px 10px",borderRadius:14,border:`1px solid ${bestExp===t?"#7b5ea7":"#ddd"}`,background:bestExp===t?"#ede9fe":"#fff",color:bestExp===t?"#7b5ea7":"#888",fontSize:11,cursor:"pointer",fontWeight:bestExp===t?600:400}}>{t}</button>
-          ))}
-        </div>
-      </div>
-      <button onClick={()=>onSave(key,{reclassification:reclassify,most_helpful_explanation:bestExp,transaction_id:txId,initial_classification:initialClass})}
-        disabled={!allDone}
-        style={{padding:"8px 20px",borderRadius:8,border:`1px solid ${allDone?"#7b5ea7":"#ccc"}`,background:allDone?"#7b5ea7":"#f5f5f5",color:allDone?"#fff":"#aaa",fontSize:12,cursor:allDone?"pointer":"default",fontWeight:600}}>
-        Save & complete this transaction →
-      </button>
-      {!allDone&&<span style={{fontSize:11,color:"#bbb",marginLeft:10}}>Complete all fields to save</span>}
-    </div>
-  );
-}
-
-// ── Per-explanation rating (shown below each explanation tab) ────────────────
 function ExpRatingWidget({txId,expTab,saved,onSave}){
   const key=`exprating-${txId}-${expTab}`;
   const [clarity,setClarity]=useState(null);
@@ -489,12 +425,56 @@ function ExpRatingWidget({txId,expTab,saved,onSave}){
     </div>
   );
 }
+
+function SummaryWidget({txId,initialClass,saved,onSave}){
+  const key=`summary-${txId}`;
+  const [reclassify,setReclassify]=useState(null);
+  const [bestExp,setBestExp]=useState(null);
+  useEffect(()=>{setReclassify(null);setBestExp(null);},[txId]);
+  if(saved[key])return(
+    <div style={{padding:"12px 14px",background:"#f0fdf4",borderRadius:8,border:"1px solid #bbf7d0"}}>
+      <div style={{fontSize:12,color:"#166534",fontWeight:600}}>✓ Summary evaluation recorded for this transaction</div>
+    </div>
+  );
+  const allDone=reclassify&&bestExp;
+  const tc=initialClass?TRUTH_CFG[initialClass]:null;
+  return(
+    <div style={{padding:"14px",background:"#f2eef9",borderRadius:8,border:"1px solid #ddd6fe"}}>
+      <div style={{fontSize:13,fontWeight:600,color:"#5b21b6",marginBottom:12}}>Step 3 — Reflect on the explanations</div>
+      {tc&&<div style={{fontSize:11,color:"#64748b",marginBottom:12}}>Your initial classification: <Badge label={`${tc.icon} ${tc.label}`} col={tc.col} bg={tc.bg}/></div>}
+      <div style={{marginBottom:12}}>
+        <div style={{fontSize:11,fontWeight:500,color:"#374151",marginBottom:6}}>Has your classification changed after reviewing the explanations?</div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {[{key:"no_change",label:"No change",col:"#475569",bg:"#f1f5f9",icon:"→"},{key:"confirmed_fraud",label:"Confirmed fraud",col:"#c0392b",bg:"#fdecea",icon:"⚠"},{key:"suspected",label:"Suspected fraud",col:"#8e44ad",bg:"#f5eeff",icon:"?"},{key:"legitimate",label:"Legitimate",col:"#1a7a4a",bg:"#e8f7ee",icon:"✓"}].map(o=>(
+            <button key={o.key} onClick={()=>setReclassify(o.key)} style={{padding:"6px 12px",borderRadius:10,border:`2px solid ${reclassify===o.key?o.col:"#ddd"}`,background:reclassify===o.key?o.bg:"#fff",color:reclassify===o.key?o.col:"#888",fontSize:12,fontWeight:reclassify===o.key?600:400,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+              <span>{o.icon}</span>{o.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={{marginBottom:12}}>
+        <div style={{fontSize:11,fontWeight:500,color:"#374151",marginBottom:6}}>Which explanation type was most helpful for your decision?</div>
+        <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+          {ALL_EXP_TABS.map(t=>(
+            <button key={t} onClick={()=>setBestExp(t)} style={{padding:"5px 10px",borderRadius:14,border:`1px solid ${bestExp===t?"#7b5ea7":"#ddd"}`,background:bestExp===t?"#ede9fe":"#fff",color:bestExp===t?"#7b5ea7":"#888",fontSize:11,cursor:"pointer",fontWeight:bestExp===t?600:400}}>{t}</button>
+          ))}
+        </div>
+      </div>
+      <button onClick={()=>onSave(key,{reclassification:reclassify,most_helpful_explanation:bestExp,transaction_id:txId,initial_classification:initialClass})}
+        disabled={!allDone}
+        style={{padding:"8px 20px",borderRadius:8,border:`1px solid ${allDone?"#7b5ea7":"#ccc"}`,background:allDone?"#7b5ea7":"#f5f5f5",color:allDone?"#fff":"#aaa",fontSize:12,cursor:allDone?"pointer":"default",fontWeight:600}}>
+        Save &amp; complete this transaction →
+      </button>
+      {!allDone&&<span style={{fontSize:11,color:"#bbb",marginLeft:10}}>Complete all fields to save</span>}
+    </div>
+  );
+}
+
 const EXP_GROUPS=[
-  {label:"Explanation methods",col:"#2980b9",bg:"#e8f0fe",desc:"",
+  {label:"Explanation methods",col:"#2980b9",bg:"#e8f0fe",
    tabs:[{id:"shap",label:"SHAP"},{id:"lime",label:"LIME"},{id:"llm",label:"LLM"},{id:"counterfactual",label:"Counterfactual"},{id:"peers",label:"Similar Cases (CBR)"}]},
 ];
 
-// ── App ───────────────────────────────────────────────────────────────────────
 export default function App(){
   const [selected,setSelected]=useState(0);
   const [expTab,setExpTab]=useState("shap");
@@ -509,6 +489,8 @@ export default function App(){
   const classified=!!saved[classifyKey];
   const summarised=!!saved[summaryKey];
   const initialClass=saved[classifyKey]?.classification;
+  const allExpRated=ALL_EXP_TABS.every(tab=>saved[`exprating-${tx.id}-${tab}`]);
+  const ratedCount=ALL_EXP_TABS.filter(tab=>saved[`exprating-${tx.id}-${tab}`]).length;
 
   const handleSave=(k,d)=>{
     setSaved(s=>({...s,[k]:d}));
@@ -521,7 +503,6 @@ export default function App(){
     <div style={{fontFamily:"system-ui,sans-serif",padding:"1rem",maxWidth:1300,margin:"0 auto"}}>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
 
-      {/* Header */}
       <div style={{marginBottom:12,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
         <div style={{fontSize:18,fontWeight:700,color:"#1e293b"}}>Fraud Detection — XAI Study</div>
         <button onClick={()=>setShowMeta(m=>!m)} style={{padding:"2px 8px",borderRadius:6,border:"1px solid #ddd",background:"#f9f9f9",color:"#bbb",fontSize:10,cursor:"pointer"}}>{showMeta?"hide":"···"}</button>
@@ -536,7 +517,6 @@ export default function App(){
         </div>
       </div>
 
-      {/* Transaction selector */}
       <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"12px 14px",marginBottom:12}}>
         <div style={{fontSize:10,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".08em",marginBottom:8}}>Select transaction to review</div>
         <div style={{display:"flex",gap:8}}>
@@ -554,24 +534,17 @@ export default function App(){
         </div>
       </div>
 
-      {/* Instructions banner */}
       <div style={{background:"#fefce8",border:"1px solid #fde68a",borderRadius:8,padding:"10px 14px",marginBottom:12,fontSize:13,color:"#78350f",lineHeight:1.6}}>
-        <strong>How to complete each transaction:</strong> (1) Review the details and risk flags on the left → (2) Make your initial classification and confirm to unlock the explanations → (3) Explore all 5 explanation types → (4) Complete the summary evaluation at the bottom.
+        <strong>How to complete each transaction:</strong> (1) Review the details and risk flags on the left → (2) Make your initial classification to unlock explanations → (3) Explore and rate all 5 explanation types → (4) Complete the final reflection at the bottom.
       </div>
 
-      {/* Main two-column layout */}
       <div style={{display:"grid",gridTemplateColumns:"300px 1fr",gap:12,alignItems:"start"}}>
-
-        {/* Left: transaction details (always visible) */}
         <TxnPanel tx={tx}/>
 
-        {/* Right: classification + explanations */}
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
-
-          {/* Step 1: classify */}
           <ClassifyWidget txId={tx.id} saved={saved} onSave={handleSave}/>
 
-          {/* Step 2: explanations (locked until classified) */}
+          {/* Step 2: explanations */}
           <div style={{background:"#fff",border:`1px solid ${classified?"#e8e8e8":"#f1f5f9"}`,borderRadius:10,padding:"14px",position:"relative"}}>
             {!classified&&(
               <div style={{position:"absolute",inset:0,background:"rgba(248,250,252,0.92)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",zIndex:10}}>
@@ -582,22 +555,22 @@ export default function App(){
                 </div>
               </div>
             )}
-            <div style={{fontSize:10,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".08em",marginBottom:10}}>
-              Step 2 — Explore explanations
-            </div>
+            <div style={{fontSize:10,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".08em",marginBottom:10}}>Step 2 — Explore explanations</div>
             {EXP_GROUPS.map(g=>(
               <div key={g.label} style={{marginBottom:6}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-                  <span style={{fontSize:10,fontWeight:600,color:g.col,minWidth:160,flexShrink:0}}>{g.label}</span>
+                  <span style={{fontSize:10,fontWeight:600,color:g.col,minWidth:140,flexShrink:0}}>{g.label}</span>
                   <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-                    {g.tabs.map(t=>(
-                      <button key={t.id} onClick={()=>setExpTab(t.id)}
-                        style={{padding:"3px 10px",fontSize:11,border:`1px solid ${expTab===t.id?g.col:"#e0e0e0"}`,borderRadius:14,background:expTab===t.id?g.bg:"#fff",color:expTab===t.id?g.col:"#888",cursor:"pointer",fontWeight:expTab===t.id?600:400}}>
-                        {t.label}
-                      </button>
-                    ))}
+                    {g.tabs.map(t=>{
+                      const rated=!!saved[`exprating-${tx.id}-${TAB_ID_TO_LABEL[t.id]||t.id}`];
+                      return(
+                        <button key={t.id} onClick={()=>setExpTab(t.id)}
+                          style={{padding:"3px 10px",fontSize:11,border:`1px solid ${expTab===t.id?g.col:rated?"#1a7a4a":"#e0e0e0"}`,borderRadius:14,background:expTab===t.id?g.bg:rated?"#f0fdf4":"#fff",color:expTab===t.id?g.col:rated?"#1a7a4a":"#888",cursor:"pointer",fontWeight:expTab===t.id?600:400}}>
+                          {rated?"✓ ":""}{t.label}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <span style={{fontSize:10,color:"#ccc",fontStyle:"italic",marginLeft:"auto"}}>{g.desc}</span>
                 </div>
               </div>
             ))}
@@ -611,15 +584,15 @@ export default function App(){
             </div>
           </div>
 
-  const allExpRated=ALL_EXP_TABS.every(tab=>saved[`exprating-${tx.id}-${tab}`]);
-
-          {/* Step 3: summary (only shown after all explanations rated) */}
+          {/* Step 3: locked until all 5 rated */}
           {classified&&!allExpRated&&(
             <div style={{padding:"10px 14px",background:"#fefce8",border:"1px solid #fde68a",borderRadius:8,fontSize:12,color:"#92400e"}}>
               📋 Rate all 5 explanations in Step 2 to unlock the final evaluation.
-              <span style={{marginLeft:6,color:"#b45309"}}>{ALL_EXP_TABS.filter(tab=>saved[`exprating-${tx.id}-${tab}`]).length}/5 rated</span>
+              <span style={{marginLeft:6,color:"#b45309",fontWeight:600}}>{ratedCount}/5 rated</span>
             </div>
           )}
+
+          {classified&&allExpRated&&(
             <SummaryWidget txId={tx.id} initialClass={initialClass} saved={saved} onSave={handleSave}/>
           )}
 
