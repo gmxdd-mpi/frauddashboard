@@ -95,43 +95,48 @@ function Gauge({score}){
   );
 }
 
-// ── SHAP beeswarm ─────────────────────────────────────────────────────────────
+// ── SHAP horizontal bars ──────────────────────────────────────────────────────
 function ShapPanel({tx}){
   const entries=getShapEntries(tx);
   const maxV=Math.max(...entries.map(e=>Math.abs(e.shap)),0.01);
-  const W=400,rowH=38,labelW=180,barW=W-labelW-60;
-  const cx=labelW+barW/2;
-  const toX=v=>(v/maxV)*(barW/2)+cx;
   return(
     <div>
       <div style={{background:"#f0f7ff",borderRadius:8,padding:"10px 14px",marginBottom:12,fontSize:12,color:"#1e40af",lineHeight:1.6}}>
-        <strong>What is SHAP?</strong> SHAP (SHapley Additive exPlanations) shows how much each feature pushed the fraud score <em>up</em> (right → red) or <em>down</em> (left → blue) from the model's average prediction. Each row is one feature of this transaction.
+        <strong>Feature contribution breakdown.</strong> Each row shows one piece of transaction data and how strongly it raised or lowered the fraud score. Think of it as the model's explanation of <em>why</em> this transaction received its score — similar to how a senior analyst would highlight which factors stood out.
       </div>
-      <div style={{display:"flex",gap:16,fontSize:11,color:"#888",marginBottom:8}}>
-        <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:10,height:10,borderRadius:"50%",background:"#c0392b",display:"inline-block"}}/>Increases fraud risk →</span>
-        <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:10,height:10,borderRadius:"50%",background:"#2563eb",display:"inline-block"}}/>← Decreases fraud risk</span>
+      <div style={{display:"flex",gap:16,fontSize:11,color:"#888",marginBottom:10}}>
+        <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:12,height:12,borderRadius:2,background:"#c0392b",display:"inline-block"}}/>Raises fraud score</span>
+        <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:12,height:12,borderRadius:2,background:"#2563eb",display:"inline-block"}}/>Lowers fraud score</span>
       </div>
-      <svg viewBox={`0 0 ${W} ${entries.length*rowH+30}`} style={{width:"100%",display:"block"}}>
-        <line x1={cx} y1={0} x2={cx} y2={entries.length*rowH+5} stroke="#e2e8f0" strokeWidth="1.5"/>
-        {entries.map((e,i)=>{
-          const y=i*rowH+rowH/2;
-          const x=toX(e.shap);
-          const isPos=e.shap>0;
-          return(
-            <g key={i}>
-              <text x={labelW-6} y={y+4} textAnchor="end" fontSize="10" fill="#334155" fontWeight="500">{e.label.split(" (")[0]}</text>
-              <text x={labelW-6} y={y+15} textAnchor="end" fontSize="8" fill="#94a3b8">{e.value}</text>
-              {/* bar from center */}
-              <rect x={isPos?cx:x} y={y-8} width={Math.abs(x-cx)} height={16} rx={4} fill={isPos?"#fca5a5":"#93c5fd"} opacity={0.6}/>
-              {/* dot */}
-              <circle cx={x} cy={y} r={6} fill={isPos?"#c0392b":"#2563eb"} opacity={0.9}/>
-              <text x={isPos?x+10:x-10} y={y+4} textAnchor={isPos?"start":"end"} fontSize="9" fill={isPos?"#c0392b":"#1d4ed8"} fontWeight="700">{isPos?"+":""}{e.shap.toFixed(3)}</text>
-            </g>
-          );
-        })}
-        <text x={cx} y={entries.length*rowH+22} textAnchor="middle" fontSize="9" fill="#94a3b8">← SHAP value (impact on model output) →</text>
-      </svg>
-      <div style={{fontSize:11,color:"#94a3b8",fontStyle:"italic",marginTop:4}}>Computed using TreeSHAP — exact Shapley values from the trained XGBoost model.</div>
+      {entries.map((e,i)=>{
+        const pct=Math.min(Math.abs(e.shap)/maxV*100,100);
+        const isPos=e.shap>0;
+        return(
+          <div key={i} style={{marginBottom:10,padding:"8px 10px",background:"#f8fafc",borderRadius:6}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:5}}>
+              <span style={{color:"#1e293b",fontWeight:600}}>{e.label.split(" (")[0]}</span>
+              <span style={{color:"#94a3b8"}}>Value: <strong style={{color:"#334155"}}>{e.value}</strong></span>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <div style={{flex:1,height:18,background:"#e2e8f0",borderRadius:4,overflow:"hidden",position:"relative"}}>
+                <div style={{
+                  position:"absolute",
+                  left:isPos?"50%":"auto",
+                  right:isPos?"auto":"50%",
+                  width:`${pct/2}%`,
+                  height:"100%",
+                  background:isPos?"#c0392b":"#2563eb",
+                  opacity:0.8,
+                  borderRadius:isPos?"0 4px 4px 0":"4px 0 0 4px"
+                }}/>
+                <div style={{position:"absolute",left:"50%",top:0,width:1,height:"100%",background:"#94a3b8"}}/>
+              </div>
+              <span style={{fontSize:11,fontWeight:700,color:isPos?"#c0392b":"#2563eb",minWidth:54,textAlign:"right"}}>{isPos?"+":""}{e.shap.toFixed(3)}</span>
+            </div>
+          </div>
+        );
+      })}
+      <div style={{fontSize:11,color:"#94a3b8",fontStyle:"italic",marginTop:4}}>Values computed using TreeSHAP — exact contributions from the trained XGBoost model.</div>
     </div>
   );
 }
@@ -143,7 +148,7 @@ function LimePanel({tx}){
   return(
     <div>
       <div style={{background:"#f0fdf4",borderRadius:8,padding:"10px 14px",marginBottom:12,fontSize:12,color:"#166534",lineHeight:1.6}}>
-        <strong>What is LIME?</strong> LIME (Local Interpretable Model-agnostic Explanations) fits a simple linear model <em>around this specific transaction</em> using 500 synthetic neighbours. It shows which feature <em>conditions</em> (rules like "amount &gt; $125") most influenced this prediction locally — not globally.
+        <strong>Condition-based breakdown.</strong> Rather than individual data points, this view shows which <em>conditions</em> about the transaction were most telling — for example, whether the amount fell above or below a typical threshold. Each condition is weighted by how much it shifted the fraud score locally for this specific alert.
       </div>
       <div style={{display:"flex",gap:16,fontSize:11,color:"#888",marginBottom:10}}>
         <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:12,height:10,borderRadius:2,background:"#c0392b",display:"inline-block"}}/>Condition increases risk</span>
@@ -190,7 +195,7 @@ function LLMPanel({tx,score}){
   return(
     <div>
       <div style={{background:"#faf5ff",borderRadius:8,padding:"10px 14px",marginBottom:12,fontSize:12,color:"#6b21a8",lineHeight:1.6}}>
-        <strong>What is LLM?</strong> A large language model reads the transaction details and SHAP values, then generates a plain-language explanation of the risk — translating model outputs into analyst-friendly text.
+        <strong>AI-generated narrative.</strong> An AI assistant reads the transaction data and model scores, then writes a plain-language summary — similar to how an experienced analyst might brief a colleague. It highlights the key risk drivers and suggests a proportionate action.
       </div>
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
         <Badge label="llama-3.1-8b-instant" col="#e65c00" bg="#fff3e0"/>
@@ -220,7 +225,7 @@ function CounterfactualPanel({tx}){
   return(
     <div>
       <div style={{background:"#eff6ff",borderRadius:8,padding:"10px 14px",marginBottom:12,fontSize:12,color:"#1e40af",lineHeight:1.6}}>
-        <strong>What is Counterfactual?</strong> Answers: "What would need to change for this transaction to be classified as lower risk?" It shows which risk-driving features the analyst can verify or challenge.
+        <strong>What-if analysis.</strong> This view asks: "If this transaction had different characteristics, would it still be flagged?" It identifies which risk factors could realistically be verified or disputed — helping you decide whether to escalate, block, or approve.
       </div>
       <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
         <thead>
@@ -265,7 +270,7 @@ function PeersPanel({tx}){
   return(
     <div>
       <div style={{background:"#f0fdf4",borderRadius:8,padding:"10px 14px",marginBottom:12,fontSize:12,color:"#166534",lineHeight:1.6}}>
-        <strong>What is Case-Based Reasoning (CBR)?</strong> Identifies the most similar transactions from the study set and shows their outcomes. Similarity is computed on transaction channel, card type, network, and amount. If similar past cases were fraud, this case is more likely to be fraud too.
+        <strong>Similar past cases.</strong> Shows other transactions from the dataset that share the most characteristics with this alert. If similar cases were previously confirmed as fraud, that raises the likelihood here too — the same reasoning an experienced investigator uses when pattern-matching against known cases.
       </div>
       <div style={{display:"flex",gap:8,marginBottom:12}}>
         {[["confirmed_fraud","#c0392b","#fdecea"],["legitimate","#1a7a4a","#e8f7ee"]].map(([k,col,bg])=>(
@@ -485,10 +490,8 @@ function ExpRatingWidget({txId,expTab,saved,onSave}){
   );
 }
 const EXP_GROUPS=[
-  {label:"Post-hoc explainability",col:"#2980b9",bg:"#e8f0fe",desc:"Applied after model prediction",
-   tabs:[{id:"shap",label:"SHAP"},{id:"lime",label:"LIME"},{id:"llm",label:"LLM"},{id:"counterfactual",label:"Counterfactual"}]},
-  {label:"Case-based reasoning",col:"#16a085",bg:"#e8f8f5",desc:"Comparison with historical cases",
-   tabs:[{id:"peers",label:"Case-Based Reasoning (CBR)"}]},
+  {label:"Explanation methods",col:"#2980b9",bg:"#e8f0fe",desc:"",
+   tabs:[{id:"shap",label:"SHAP"},{id:"lime",label:"LIME"},{id:"llm",label:"LLM"},{id:"counterfactual",label:"Counterfactual"},{id:"peers",label:"Similar Cases (CBR)"}]},
 ];
 
 // ── App ───────────────────────────────────────────────────────────────────────
@@ -608,8 +611,15 @@ export default function App(){
             </div>
           </div>
 
-          {/* Step 3: summary (only shown after classification) */}
-          {classified&&(
+  const allExpRated=ALL_EXP_TABS.every(tab=>saved[`exprating-${tx.id}-${tab}`]);
+
+          {/* Step 3: summary (only shown after all explanations rated) */}
+          {classified&&!allExpRated&&(
+            <div style={{padding:"10px 14px",background:"#fefce8",border:"1px solid #fde68a",borderRadius:8,fontSize:12,color:"#92400e"}}>
+              📋 Rate all 5 explanations in Step 2 to unlock the final evaluation.
+              <span style={{marginLeft:6,color:"#b45309"}}>{ALL_EXP_TABS.filter(tab=>saved[`exprating-${tx.id}-${tab}`]).length}/5 rated</span>
+            </div>
+          )}
             <SummaryWidget txId={tx.id} initialClass={initialClass} saved={saved} onSave={handleSave}/>
           )}
 
