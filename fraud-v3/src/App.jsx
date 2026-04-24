@@ -400,21 +400,8 @@ function ExpRatingWidget({txId, expTab, expTabId, saved, onSave, onNext, isLastT
       <div style={{fontSize:11,fontWeight:600,color:"#475569",marginBottom:10}}>Rate this explanation — {expTab}</div>
 
       {alreadySaved ? (
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
-          <div style={{fontSize:12,color:"#166534",fontWeight:500}}>
-            ✓ Rated: Clarity <strong>{saved[key].clarity}/5</strong> · Completeness <strong>{saved[key].completeness}/5</strong>
-          </div>
-          {!isLastTab && (
-            <button
-              onClick={onNext}
-              style={{display:"flex",alignItems:"center",gap:6,padding:"7px 16px",borderRadius:8,border:"1px solid #2980b9",background:"#e8f0fe",color:"#2980b9",fontSize:12,fontWeight:600,cursor:"pointer"}}
-            >
-              Next explanation <span style={{fontSize:15,lineHeight:1}}>→</span>
-            </button>
-          )}
-          {isLastTab && (
-            <span style={{fontSize:11,color:"#94a3b8",fontStyle:"italic"}}>All explanations rated ✓</span>
-          )}
+        <div style={{fontSize:12,color:"#166534",fontWeight:500}}>
+          ✓ Rated: Clarity <strong>{saved[key].clarity}/5</strong> · Completeness <strong>{saved[key].completeness}/5</strong>
         </div>
       ) : (
         <>
@@ -525,6 +512,10 @@ export default function App(){
   const handleSave=(k,d)=>{
     setSaved(s=>({...s,[k]:d}));
     fetch(SHEET_URL,{method:"POST",body:JSON.stringify({participant_id:participantId,key:k,...d})}).catch(()=>{});
+    // Auto-advance to next explanation tab after rating
+    if(k.startsWith("exprating-")&&!isLastTab){
+      goToNextTab();
+    }
   };
 
   const completedCount=ALL_TXN.filter(t=>saved[`summary-${t.id}`]).length;
