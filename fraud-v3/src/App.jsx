@@ -96,13 +96,20 @@ function Gauge({score}){
   );
 }
 
+function riskLabel(v, max) {
+  const r = Math.abs(v) / max;
+  const dir = v > 0 ? "increases" : "decreases";
+  const strength = r > 0.66 ? "strongly" : r > 0.33 ? "moderately" : "slightly";
+  return `${strength} ${dir} risk`;
+}
+
 function ShapPanel({tx}){
   const entries=getShapEntries(tx);
   const maxV=Math.max(...entries.map(e=>Math.abs(e.shap)),0.01);
   return(
     <div>
       <div style={{background:"#f0f7ff",borderRadius:8,padding:"10px 14px",marginBottom:12,fontSize:12,color:"#1e40af",lineHeight:1.6}}>
-        <strong>Feature contribution breakdown.</strong> Each row shows one piece of transaction data and how strongly it raised or lowered the fraud score. Think of it as the model's explanation of <em>why</em> this transaction received its score — similar to how a senior analyst would highlight which factors stood out.
+        <strong>How much did each feature shift the score away from average?</strong> The model has a baseline — the average fraud score across all transactions. SHAP measures how much each feature in <em>this specific transaction</em> pushed the score above or below that average. A card type that is unusually common in fraud, for example, would push the score up. Each bar shows the size of that push. The numbers are on the same scale and can be compared directly across rows.
       </div>
       <div style={{display:"flex",gap:16,fontSize:11,color:"#888",marginBottom:10}}>
         <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:12,height:12,borderRadius:2,background:"#c0392b",display:"inline-block"}}/>Raises fraud score</span>
@@ -113,9 +120,12 @@ function ShapPanel({tx}){
         const isPos=e.shap>0;
         return(
           <div key={i} style={{marginBottom:10,padding:"8px 10px",background:"#f8fafc",borderRadius:6}}>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:5}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:5,flexWrap:"wrap",gap:4}}>
               <span style={{color:"#1e293b",fontWeight:600}}>{e.label.split(" (")[0]}</span>
-              <span style={{color:"#94a3b8"}}>Value: <strong style={{color:"#334155"}}>{e.value}</strong></span>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <span style={{fontSize:11,fontStyle:"italic",color:isPos?"#c0392b":"#2563eb"}}>{riskLabel(e.shap, maxV)}</span>
+                <span style={{color:"#94a3b8"}}>Value: <strong style={{color:"#334155"}}>{e.value}</strong></span>
+              </div>
             </div>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <div style={{flex:1,height:18,background:"#e2e8f0",borderRadius:4,overflow:"hidden",position:"relative"}}>
@@ -138,27 +148,34 @@ function LimePanel({tx}){
   return(
     <div>
       <div style={{background:"#f0fdf4",borderRadius:8,padding:"10px 14px",marginBottom:12,fontSize:12,color:"#166534",lineHeight:1.6}}>
-        <strong>Condition-based breakdown.</strong> Rather than individual data points, this view shows which conditions about the transaction were most telling — for example, whether the amount fell above or below a typical threshold. Each condition is weighted by how much it shifted the fraud score for this specific alert.
+        <strong>Which rules about this transaction mattered most?</strong> LIME works differently from SHAP. Rather than measuring exact feature contributions, it asks: <em>"What simple rules best explain why the model scored this transaction the way it did?"</em> — for example, "amount was above $125" or "distance data was missing". It then fits a local approximation around this transaction and weights each rule by how strongly it influenced the prediction. <strong>These weights are not on the same scale as SHAP</strong> — they reflect rule importance within this local approximation, not departure from a global baseline.
       </div>
       <div style={{display:"flex",gap:16,fontSize:11,color:"#888",marginBottom:10}}>
-        <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:12,height:10,borderRadius:2,background:"#c0392b",display:"inline-block"}}/>Condition increases risk</span>
-        <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:12,height:10,borderRadius:2,background:"#1a7a4a",display:"inline-block"}}/>Condition decreases risk</span>
+        <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:12,height:10,borderRadius:2,background:"#c0392b",display:"inline-block"}}/>Condition raises risk</span>
+        <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:12,height:10,borderRadius:2,background:"#1a7a4a",display:"inline-block"}}/>Condition lowers risk</span>
       </div>
       {entries.map((e,i)=>{
         const pct=Math.min(Math.abs(e.v)/maxV*90,90);
         const isPos=e.v>0;
+        const col=isPos?"#c0392b":"#1a7a4a";
+        const bgCol=isPos?"#fca5a5":"#86efac";
         return(
-          <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-            <div style={{width:220,fontSize:10,color:"#334155",fontFamily:"monospace",background:"#f1f5f9",padding:"3px 7px",borderRadius:4,flexShrink:0,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}} title={e.rule}>{e.rule}</div>
-            <div style={{flex:1,height:18,background:"#f1f5f9",borderRadius:4,overflow:"hidden",position:"relative"}}>
-              <div style={{position:"absolute",[isPos?"left":"right"]:0,width:`${pct}%`,height:"100%",background:isPos?"#fca5a5":"#86efac",borderRadius:4}}/>
-              <div style={{position:"absolute",top:0,bottom:0,[isPos?"left":"right"]:`${pct}%`,width:3,background:isPos?"#c0392b":"#1a7a4a",borderRadius:2}}/>
+          <div key={i} style={{marginBottom:10,padding:"8px 10px",background:"#f8fafc",borderRadius:6}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:5,flexWrap:"wrap",gap:4}}>
+              <span style={{color:"#334155",fontFamily:"monospace",fontSize:10,background:"#f1f5f9",padding:"2px 6px",borderRadius:4}}>{e.rule}</span>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <span style={{fontSize:11,fontStyle:"italic",color:col}}>{riskLabel(e.v, maxV)}</span>
+                <span style={{fontSize:11,fontWeight:700,color:col,minWidth:58,textAlign:"right"}}>{isPos?"+":""}{e.v.toFixed(4)}</span>
+              </div>
             </div>
-            <span style={{fontSize:11,fontWeight:700,color:isPos?"#c0392b":"#1a7a4a",minWidth:58,textAlign:"right"}}>{isPos?"+":""}{e.v.toFixed(4)}</span>
+            <div style={{flex:1,height:14,background:"#e2e8f0",borderRadius:4,overflow:"hidden",position:"relative"}}>
+              <div style={{position:"absolute",left:0,width:`${pct}%`,height:"100%",background:bgCol,borderRadius:4}}/>
+              <div style={{position:"absolute",top:0,bottom:0,left:`${pct}%`,width:3,background:col,borderRadius:2}}/>
+            </div>
           </div>
         );
       })}
-      <div style={{marginTop:8,fontSize:11,color:"#94a3b8",fontStyle:"italic"}}>LIME is a local approximation — may differ slightly from SHAP which uses exact model values.</div>
+      <div style={{marginTop:8,fontSize:11,color:"#94a3b8",fontStyle:"italic"}}>LIME approximates the model locally — values reflect this transaction specifically, not global model behaviour.</div>
     </div>
   );
 }
