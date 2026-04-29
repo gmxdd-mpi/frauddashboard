@@ -48,9 +48,24 @@ function getShapEntries(tx){
   const vals={TransactionAmt:`$${tx.amount.toFixed(2)}`,ProductCD:CHANNEL_LABELS[tx.product]||tx.product,card4:tx.network,card6:tx.cardType,addr1:tx.addr??'N/A',dist1:tx.dist!==null?`${tx.dist} km`:'N/A'};
   return Object.entries(shap).map(([k,v])=>({key:k,label:FEAT_LABELS[k]||k,value:vals[k],shap:v})).sort((a,b)=>Math.abs(b.shap)-Math.abs(a.shap));
 }
+function annotateLimeRule(rule){
+  if(/TransactionAmt > 125/.test(rule))   return "Amount is high — above the typical threshold for this channel";
+  if(/TransactionAmt <= 43/.test(rule))   return "Amount is low — well within the normal range for this channel";
+  if(/68\.77 < TransactionAmt <= 125/.test(rule)) return "Amount is moderate — within a common mid-range band";
+  if(/card6 <= 1/.test(rule))             return "Card type is credit — more commonly linked to fraud in this dataset";
+  if(/card4 <= 2/.test(rule))             return "Card network is one less frequently associated with fraud";
+  if(/ProductCD <= 3/.test(rule))         return "Transaction channel is one more commonly seen in legitimate purchases";
+  if(/dist1 > 5/.test(rule))              return "Transaction occurred notably far from the billing address";
+  if(/dist1 <= -1/.test(rule))            return "No distance data available — billing location could not be verified";
+  if(/addr1 <= 184/.test(rule))           return "Billing region is in a lower-code area, less common for this card type";
+  if(/184\.00 < addr1 <= 272/.test(rule)) return "Billing region is in a mid-range area — typical for this card type";
+  if(/272\.00 < addr1 <= 327/.test(rule)) return "Billing region is in a higher-code area — consistent with card history";
+  return null;
+}
+
 function getLimeEntries(tx){
   if(!tx)return[];
-  return Object.entries(REAL_EXPLANATIONS[tx.id]?.lime??{}).map(([k,v])=>({rule:k,v})).sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));
+  return Object.entries(REAL_EXPLANATIONS[tx.id]?.lime??{}).map(([k,v])=>({rule:k,annotation:annotateLimeRule(k),v})).sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));
 }
 function getRiskFlags(tx,score){
   const f=[];
@@ -96,6 +111,36 @@ function Gauge({score}){
   );
 }
 
+const SHAP_TOOLTIPS = {
+  TransactionAmt: "The dollar amount of this transaction. Unusually high amounts relative to the cardholder's norm can push the fraud score up.",
+  ProductCD: "The channel through which the transaction was made — e.g. web purchase or card payment. Some channels are more commonly associated with fraud.",
+  card4: "The card network (e.g. Visa, Mastercard). Certain networks appear more frequently in fraudulent transactions in the training data.",
+  card6: "Whether the card is a credit or debit card. The model learned that one type is more associated with fraud in this dataset.",
+  addr1: "The billing region code linked to the card. A mismatch between billing region and transaction location can signal fraud.",
+  dist1: "The distance in km between the billing address and where the transaction occurred. Large distances can indicate the card is being used away from its owner.",
+};
+
+function ShapTooltip({featureKey}){
+  const [vis, setVis] = useState(false);
+  const tip = SHAP_TOOLTIPS[featureKey];
+  if(!tip) return null;
+  return(
+    <span style={{position:"relative",display:"inline-flex",alignItems:"center",marginLeft:5}}>
+      <span
+        onMouseEnter={()=>setVis(true)}
+        onMouseLeave={()=>setVis(false)}
+        style={{width:15,height:15,borderRadius:"50%",background:"#cbd5e1",color:"#475569",fontSize:10,fontWeight:700,display:"inline-flex",alignItems:"center",justifyContent:"center",cursor:"default",flexShrink:0,lineHeight:1}}
+      >?</span>
+      {vis&&(
+        <span style={{position:"absolute",left:"50%",bottom:"calc(100% + 6px)",transform:"translateX(-50%)",background:"#1e293b",color:"#f8fafc",fontSize:11,lineHeight:1.5,padding:"7px 10px",borderRadius:7,width:220,zIndex:100,boxShadow:"0 4px 12px rgba(0,0,0,0.18)",pointerEvents:"none"}}>
+          {tip}
+          <span style={{position:"absolute",left:"50%",top:"100%",transform:"translateX(-50%)",borderWidth:5,borderStyle:"solid",borderColor:"#1e293b transparent transparent transparent",display:"block",width:0,height:0}}/>
+        </span>
+      )}
+    </span>
+  );
+}
+
 function riskLabel(v, max) {
   const r = Math.abs(v) / max;
   const dir = v > 0 ? "increases" : "decreases";
@@ -121,7 +166,7 @@ function ShapPanel({tx}){
         return(
           <div key={i} style={{marginBottom:10,padding:"8px 10px",background:"#f8fafc",borderRadius:6}}>
             <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:5,flexWrap:"wrap",gap:4}}>
-              <span style={{color:"#1e293b",fontWeight:600}}>{e.label.split(" (")[0]}</span>
+              <span style={{display:"inline-flex",alignItems:"center",color:"#1e293b",fontWeight:600}}>{e.label.split(" (")[0]}<ShapTooltip featureKey={e.key}/></span>
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
                 <span style={{fontSize:11,fontStyle:"italic",color:isPos?"#c0392b":"#2563eb"}}>{riskLabel(e.shap, maxV)}</span>
                 <span style={{color:"#94a3b8"}}>Value: <strong style={{color:"#334155"}}>{e.value}</strong></span>
@@ -162,7 +207,10 @@ function LimePanel({tx}){
         return(
           <div key={i} style={{marginBottom:10,padding:"8px 10px",background:"#f8fafc",borderRadius:6}}>
             <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:5,flexWrap:"wrap",gap:4}}>
-              <span style={{color:"#334155",fontFamily:"monospace",fontSize:10,background:"#f1f5f9",padding:"2px 6px",borderRadius:4}}>{e.rule}</span>
+              <div>
+                <div style={{fontWeight:600,color:"#1e293b",marginBottom:2}}>{e.annotation||e.rule}</div>
+                <div style={{color:"#94a3b8",fontFamily:"monospace",fontSize:10}}>{e.rule}</div>
+              </div>
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
                 <span style={{fontSize:11,fontStyle:"italic",color:col}}>{riskLabel(e.v, maxV)}</span>
                 <span style={{fontSize:11,fontWeight:700,color:col,minWidth:58,textAlign:"right"}}>{isPos?"+":""}{e.v.toFixed(4)}</span>
@@ -235,7 +283,7 @@ function CounterfactualPanel({tx}){
       <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
         <thead>
           <tr style={{background:"#f1f5f9"}}>
-            {["Feature","Current value","SHAP impact","What would need to change","Analyst can act?"].map(h=>(
+            {["Feature","Current value","What would need to change","Analyst can act?"].map(h=>(
               <th key={h} style={{padding:"8px 10px",textAlign:"left",fontWeight:600,color:"#475569",borderBottom:"2px solid #e2e8f0",whiteSpace:"nowrap"}}>{h}</th>
             ))}
           </tr>
@@ -248,7 +296,6 @@ function CounterfactualPanel({tx}){
               <tr key={i} style={{background:i%2===0?"#fff":"#f8fafc"}}>
                 <td style={{padding:"8px 10px",fontWeight:500,color:"#1e293b"}}>{FEAT_LABELS[k]||k}</td>
                 <td style={{padding:"8px 10px",color:"#64748b"}}>{valMap[k]}</td>
-                <td style={{padding:"8px 10px",color:"#c0392b",fontWeight:600}}>+{v.toFixed(3)}</td>
                 <td style={{padding:"8px 10px",color:"#2563eb"}}>{a.required}</td>
                 <td style={{padding:"8px 10px"}}>
                   <span style={{padding:"2px 8px",borderRadius:10,fontSize:11,fontWeight:600,background:a.feasible?"#dcfce7":"#f1f5f9",color:a.feasible?"#15803d":"#94a3b8"}}>{a.feasible?"✓ Yes":"✗ No"}</span>
