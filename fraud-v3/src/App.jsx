@@ -565,14 +565,23 @@ const EXP_GROUPS=[
    tabs:[{id:"shap",label:"SHAP"},{id:"lime",label:"LIME"},{id:"llm",label:"LLM"},{id:"counterfactual",label:"Counterfactual"},{id:"peers",label:"Similar Cases (CBR)"}]},
 ];
 
+function shuffle(arr){
+  const a=[...arr];
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+  return a;
+}
+
 export default function App(){
   const [selected,setSelected]=useState(0);
-  const [expTab,setExpTab]=useState("shap");
   const [saved,setSaved]=useState({});
   const [showMeta,setShowMeta]=useState(false);
   const participantId=useState(()=>`P-${Date.now().toString(36).toUpperCase()}`)[0];
 
-  const tx=ALL_TXN[selected];
+  const [txnOrder]=useState(()=>shuffle(ALL_TXN));
+  const [tabOrder]=useState(()=>shuffle(EXP_TAB_IDS));
+  const [expTab,setExpTab]=useState(()=>tabOrder[0]);
+
+  const tx=txnOrder[selected];
   const score=xgbScore(tx);
   const classifyKey=`classify-${tx.id}`;
   const summaryKey=`summary-${tx.id}`;
@@ -582,10 +591,10 @@ export default function App(){
   const allExpRated=ALL_EXP_TABS.every(tab=>saved[`exprating-${tx.id}-${tab}`]);
   const ratedCount=ALL_EXP_TABS.filter(tab=>saved[`exprating-${tx.id}-${tab}`]).length;
 
-  const currentTabIdx=EXP_TAB_IDS.indexOf(expTab);
-  const isLastTab=currentTabIdx===EXP_TAB_IDS.length-1;
+  const currentTabIdx=tabOrder.indexOf(expTab);
+  const isLastTab=currentTabIdx===tabOrder.length-1;
   const goToNextTab=()=>{
-    if(!isLastTab) setExpTab(EXP_TAB_IDS[currentTabIdx+1]);
+    if(!isLastTab) setExpTab(tabOrder[currentTabIdx+1]);
   };
 
   const handleSave=(k,d)=>{
@@ -597,7 +606,7 @@ export default function App(){
     }
   };
 
-  const completedCount=ALL_TXN.filter(t=>saved[`summary-${t.id}`]).length;
+            const completedCount=txnOrder.filter(t=>saved[`summary-${t.id}`]).length;
 
   return(
     <div style={{fontFamily:"system-ui,sans-serif",padding:"1rem",maxWidth:1300,margin:"0 auto"}}>
@@ -620,11 +629,11 @@ export default function App(){
       <div style={{background:"#fff",border:"1px solid #e8e8e8",borderRadius:10,padding:"12px 14px",marginBottom:12}}>
         <div style={{fontSize:10,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".08em",marginBottom:8}}>Select transaction to review</div>
         <div style={{display:"flex",gap:8}}>
-          {ALL_TXN.map((t,i)=>{
+          {txnOrder.map((t,i)=>{
             const done=!!saved[`summary-${t.id}`];
             const isCurrent=selected===i;
             return(
-              <button key={t.id} onClick={()=>{setSelected(i);setExpTab("shap");}}
+              <button key={t.id} onClick={()=>{setSelected(i);setExpTab(tabOrder[0]);}}
                 style={{flex:1,padding:"10px 8px",borderRadius:8,border:`2px solid ${isCurrent?"#2980b9":done?"#1a7a4a":"#e0e0e0"}`,background:isCurrent?"#eff6ff":done?"#f0fdf4":"#fafafa",cursor:"pointer",textAlign:"center"}}>
                 <div style={{fontSize:14,fontWeight:700,color:isCurrent?"#2980b9":done?"#1a7a4a":"#555"}}>TXN {i+1}</div>
                 <div style={{fontSize:10,color:isCurrent?"#2980b9":done?"#1a7a4a":"#94a3b8",marginTop:2}}>{done?"✓ Done":isCurrent?"In progress":"Not started"}</div>
@@ -661,7 +670,7 @@ export default function App(){
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
                   <span style={{fontSize:10,fontWeight:600,color:g.col,minWidth:140,flexShrink:0}}>{g.label}</span>
                   <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-                    {g.tabs.map(t=>{
+                    {g.tabs.filter(t=>tabOrder.includes(t.id)).sort((a,b)=>tabOrder.indexOf(a.id)-tabOrder.indexOf(b.id)).map(t=>{
                       const rated=!!saved[`exprating-${tx.id}-${TAB_ID_TO_LABEL[t.id]||t.id}`];
                       return(
                         <button key={t.id} onClick={()=>setExpTab(t.id)}
