@@ -48,24 +48,39 @@ function getShapEntries(tx){
   const vals={TransactionAmt:`$${tx.amount.toFixed(2)}`,ProductCD:CHANNEL_LABELS[tx.product]||tx.product,card4:tx.network,card6:tx.cardType,addr1:tx.addr??'N/A',dist1:tx.dist!==null?`${tx.dist} km`:'N/A'};
   return Object.entries(shap).map(([k,v])=>({key:k,label:FEAT_LABELS[k]||k,value:vals[k],shap:v})).sort((a,b)=>Math.abs(b.shap)-Math.abs(a.shap));
 }
-function annotateLimeRule(rule){
-  if(/TransactionAmt > 125/.test(rule))   return "Amount is high — above the typical threshold for this channel";
-  if(/TransactionAmt <= 43/.test(rule))   return "Amount is low — well within the normal range for this channel";
+const FRAUD_RATES = {
+  card6: { credit: 6.7, debit: 2.4, "charge card": 0.0, "debit or credit": 0.0 },
+  card4: { visa: 3.5, mastercard: 3.4, discover: 7.7, "american express": 2.9 },
+  ProductCD: { C: 11.7, H: 4.8, R: 3.8, S: 5.9, W: 2.0 },
+};
+
+function annotateLimeRule(rule, tx){
+  const channel = CHANNEL_LABELS[tx.product] || tx.product;
+  const network = tx.network.toLowerCase();
+  const cardType = tx.cardType.toLowerCase();
+  const addr = tx.addr ?? "unknown";
+
+  const cardTypeRate = FRAUD_RATES.card6[cardType];
+  const networkRate = FRAUD_RATES.card4[network];
+  const channelRate = FRAUD_RATES.ProductCD[tx.product];
+
+  if(/TransactionAmt > 125/.test(rule))          return "Amount is high — above the typical threshold for this channel";
+  if(/TransactionAmt <= 43/.test(rule))           return "Amount is low — well within the normal range for this channel";
   if(/68\.77 < TransactionAmt <= 125/.test(rule)) return "Amount is moderate — within a common mid-range band";
-  if(/card6 <= 1/.test(rule))             return "Card type is credit — more commonly linked to fraud in this dataset";
-  if(/card4 <= 2/.test(rule))             return "Card network is one less frequently associated with fraud";
-  if(/ProductCD <= 3/.test(rule))         return "Transaction channel is one more commonly seen in legitimate purchases";
-  if(/dist1 > 5/.test(rule))              return "Transaction occurred notably far from the billing address";
-  if(/dist1 <= -1/.test(rule))            return "No distance data available — billing location could not be verified";
-  if(/addr1 <= 184/.test(rule))           return "Billing region is in a lower-code area, less common for this card type";
-  if(/184\.00 < addr1 <= 272/.test(rule)) return "Billing region is in a mid-range area — typical for this card type";
-  if(/272\.00 < addr1 <= 327/.test(rule)) return "Billing region is in a higher-code area — consistent with card history";
+  if(/card6 <= 1/.test(rule))                     return `Card type is ${tx.cardType} — ${cardTypeRate}% of ${tx.cardType} card transactions in the training data were fraudulent`;
+  if(/card4 <= 2/.test(rule))                     return `Card network is ${tx.network} — ${networkRate}% of ${tx.network} transactions in the training data were fraudulent`;
+  if(/ProductCD <= 3/.test(rule))                 return `Transaction channel is ${channel} — ${channelRate}% of ${channel.toLowerCase()} transactions in the training data were fraudulent`;
+  if(/dist1 > 5/.test(rule))                      return "Transaction occurred notably far from the billing address — a potential sign the card is being used away from its owner";
+  if(/dist1 <= -1/.test(rule))                    return "No distance data available — the transaction location could not be compared against the billing address";
+  if(/addr1 <= 184/.test(rule))                   return `Billing region code is ${addr} — the model weighted this region when scoring this transaction`;
+  if(/184\.00 < addr1 <= 272/.test(rule))         return `Billing region code is ${addr} — the model weighted this region when scoring this transaction`;
+  if(/272\.00 < addr1 <= 327/.test(rule))         return `Billing region code is ${addr} — the model weighted this region when scoring this transaction`;
   return null;
 }
 
 function getLimeEntries(tx){
   if(!tx)return[];
-  return Object.entries(REAL_EXPLANATIONS[tx.id]?.lime??{}).map(([k,v])=>({rule:k,annotation:annotateLimeRule(k),v})).sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));
+  return Object.entries(REAL_EXPLANATIONS[tx.id]?.lime??{}).map(([k,v])=>({rule:k,annotation:annotateLimeRule(k,tx),v})).sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));
 }
 function getRiskFlags(tx,score){
   const f=[];
