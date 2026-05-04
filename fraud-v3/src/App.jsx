@@ -80,7 +80,18 @@ function annotateLimeRule(rule, tx){
 
 function getLimeEntries(tx){
   if(!tx)return[];
-  return Object.entries(REAL_EXPLANATIONS[tx.id]?.lime??{}).map(([k,v])=>({rule:k,annotation:annotateLimeRule(k,tx),v})).sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));
+  return Object.entries(REAL_EXPLANATIONS[tx.id]?.lime??{})
+    .filter(([rule])=>{
+      // Suppress rules that contradict known transaction data
+      if(/dist1 <= -1/.test(rule) && tx.dist !== null) return false;
+      if(/dist1 > 5/.test(rule) && tx.dist === null) return false;
+      if(/TransactionAmt > 125/.test(rule) && tx.amount <= 125) return false;
+      if(/TransactionAmt <= 43/.test(rule) && tx.amount > 43) return false;
+      if(/68\.77 < TransactionAmt <= 125/.test(rule) && (tx.amount <= 68.77 || tx.amount > 125)) return false;
+      return true;
+    })
+    .map(([k,v])=>({rule:k, annotation:annotateLimeRule(k,tx), v}))
+    .sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));
 }
 function getRiskFlags(tx,score){
   const f=[];
@@ -246,13 +257,28 @@ function LimePanel({tx}){
 function LLMPanel({tx,score}){
   const [text,setText]=useState("");const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");const [done,setDone]=useState(false);
+  const [showPrompt,setShowPrompt]=useState(false);
+
+  const r=riskLevel(score);
+  const prompt=`You are an expert fraud analyst writing a case summary for a colleague who will decide whether to approve, flag, or block a transaction.
+
+Transaction details:
+- Amount: ${tx.amount.toFixed(2)}
+- Channel: ${CHANNEL_LABELS[tx.product]||tx.product}
+- Card: ${tx.network} ${tx.cardType}
+- Billing region: ${tx.addr??"not provided"}
+- Distance from billing address: ${tx.dist!==null?tx.dist+" km":"unavailable"}
+- Fraud risk score: ${Math.round(score*100)} out of 100 (${r.text})
+
+Write 3 short paragraphs:
+1. Summarise the overall risk level and the two or three most notable characteristics of this transaction.
+2. Describe anything that looks unusual or inconsistent about this transaction.
+3. Recommend a clear action — approve, investigate further, or block — and briefly explain why.
+
+Write in plain English as if briefing a colleague. Do not use bullet points, technical jargon, or mention model internals.`;
+
   const run=async()=>{
     setLoading(true);setError("");setText("");setDone(false);
-    const r=riskLevel(score);
-    const shap=REAL_EXPLANATIONS[tx.id]?.shap??{};
-    const topFeats=Object.entries(shap).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1])).slice(0,4)
-      .map(([k,v])=>`${FEAT_LABELS[k]||k}: SHAP ${v>0?"+":""}${v.toFixed(3)} (${v>0?"increases":"decreases"} risk)`).join("; ");
-    const prompt=`You are an AI assistant in a bank fraud detection system helping anti-fraud analysts.\n\nTransaction: $${tx.amount.toFixed(2)} | ${CHANNEL_LABELS[tx.product]||tx.product} | ${tx.network} ${tx.cardType} | Billing region: ${tx.addr??"not provided"} | Distance: ${tx.dist!==null?tx.dist+"km":"unavailable"} | Score: ${Math.round(score*100)}/100 (${r.text})\nTop SHAP features: ${topFeats}\n\nWrite 3 concise paragraphs: (1) Overall risk and top 2-3 drivers, (2) What the model detected and any inconsistencies, (3) Recommended action proportionate to risk. Be direct, no bullet points.`;
     try{
       const res=await fetch("https://api.groq.com/openai/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${import.meta.env.VITE_GROQ_API_KEY}`},body:JSON.stringify({model:"llama-3.1-8b-instant",max_tokens:450,messages:[{role:"user",content:prompt}]})});
       const data=await res.json();
@@ -261,15 +287,22 @@ function LLMPanel({tx,score}){
     }catch{setError("API call failed.");}
     setLoading(false);
   };
+
   return(
     <div>
       <div style={{background:"#faf5ff",borderRadius:8,padding:"10px 14px",marginBottom:12,fontSize:12,color:"#6b21a8",lineHeight:1.6}}>
-        <strong>AI-generated narrative.</strong> An AI assistant reads the transaction data and model scores, then writes a plain-language summary — similar to how an experienced analyst might brief a colleague. It highlights the key risk drivers and suggests a proportionate action.
+        <strong>AI-generated narrative.</strong> An AI assistant reads the transaction details and writes a plain-language case summary — similar to how an experienced analyst might brief a colleague. It highlights what stands out and recommends an action.
       </div>
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
         <Badge label="llama-3.1-8b-instant" col="#e65c00" bg="#fff3e0"/>
         <Badge label="Groq API" col="#2980b9" bg="#e8f0fe"/>
+        <button onClick={()=>setShowPrompt(p=>!p)} style={{marginLeft:"auto",padding:"2px 10px",borderRadius:6,border:"1px solid #ddd6fe",background:"#f5f3ff",color:"#7c3aed",fontSize:11,cursor:"pointer"}}>{showPrompt?"Hide prompt":"View prompt ↗"}</button>
       </div>
+      {showPrompt&&(
+        <div style={{background:"#f5f3ff",border:"1px solid #ddd6fe",borderRadius:8,padding:"10px 12px",marginBottom:12,fontSize:11,color:"#4c1d95",fontFamily:"monospace",whiteSpace:"pre-wrap",lineHeight:1.6}}>
+          {prompt}
+        </div>
+      )}
       {!done&&!loading&&<button onClick={run} style={{padding:"8px 18px",borderRadius:8,border:"1px solid #6b3fa0",background:"#f9f4ff",color:"#6b3fa0",fontSize:13,cursor:"pointer",fontWeight:500}}>Generate narrative ↗</button>}
       {loading&&<div style={{display:"flex",alignItems:"center",gap:8,color:"#888",fontSize:13}}><div style={{width:13,height:13,border:"2px solid #ccc",borderTopColor:"#6b3fa0",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>Generating…</div>}
       {error&&<div style={{color:"#c0392b",fontSize:13,padding:"8px 12px",background:"#fdecea",borderRadius:6}}>{error}</div>}
@@ -333,10 +366,11 @@ function PeersPanel({tx}){
     if((t.dist===null)===(tx.dist===null))sim+=10;return{...t,sim};
   }).sort((a,b)=>b.sim-a.sim);
   const fraudCount=others.filter(p=>p.groundTruth==="confirmed_fraud").length;
+  const [expanded,setExpanded]=useState(null);
   return(
     <div>
       <div style={{background:"#f0fdf4",borderRadius:8,padding:"10px 14px",marginBottom:12,fontSize:12,color:"#166534",lineHeight:1.6}}>
-        <strong>Similar past cases.</strong> Shows other transactions from the dataset that share the most characteristics with this alert. If similar cases were previously confirmed as fraud, that raises the likelihood here too — the same reasoning an experienced investigator uses when pattern-matching against known cases.
+        <strong>Similar past cases.</strong> Shows other transactions from the dataset that share the most characteristics with this alert. If similar cases were previously confirmed as fraud, that raises the likelihood here too — the same reasoning an experienced investigator uses when pattern-matching against known cases. <strong>Click any case to expand it.</strong>
       </div>
       <div style={{display:"flex",gap:8,marginBottom:12}}>
         {[["confirmed_fraud","#c0392b","#fdecea"],["legitimate","#1a7a4a","#e8f7ee"]].map(([k,col,bg])=>(
@@ -352,18 +386,56 @@ function PeersPanel({tx}){
       </div>
       {others.map((p,i)=>{
         const tc=TRUTH_CFG[p.groundTruth];const ps=xgbScore(p);const pr=riskLevel(ps);
+        const isOpen=expanded===p.id;
+        const flags=getRiskFlags(p,ps);
         return(
-          <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",marginBottom:6,background:"#f8fafc",borderRadius:8,border:"1px solid #e2e8f0"}}>
-            <div style={{width:38,textAlign:"center"}}>
-              <div style={{fontSize:12,fontWeight:700,color:"#475569"}}>{p.sim}%</div>
-              <div style={{fontSize:9,color:"#94a3b8"}}>similar</div>
+          <div key={i} style={{marginBottom:6,borderRadius:8,border:`1px solid ${isOpen?"#93c5fd":"#e2e8f0"}`,overflow:"hidden"}}>
+            <div onClick={()=>setExpanded(isOpen?null:p.id)}
+              style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:isOpen?"#eff6ff":"#f8fafc",cursor:"pointer"}}>
+              <div style={{width:38,textAlign:"center"}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#475569"}}>{p.sim}%</div>
+                <div style={{fontSize:9,color:"#94a3b8"}}>similar</div>
+              </div>
+              <div style={{width:2,height:32,background:"#e2e8f0",flexShrink:0}}/>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,fontWeight:500,color:"#1e293b"}}>TXN {p.id} · ${p.amount.toFixed(2)}</div>
+                <div style={{fontSize:11,color:"#64748b"}}>{p.network} {p.cardType} · {CHANNEL_LABELS[p.product]||p.product} · Score: <strong style={{color:pr.col}}>{Math.round(ps*100)}</strong></div>
+              </div>
+              <Badge label={`${tc.icon} ${tc.label}`} col={tc.col} bg={tc.bg}/>
+              <span style={{fontSize:12,color:"#94a3b8",marginLeft:4}}>{isOpen?"▲":"▼"}</span>
             </div>
-            <div style={{width:2,height:32,background:"#e2e8f0",flexShrink:0}}/>
-            <div style={{flex:1}}>
-              <div style={{fontSize:12,fontWeight:500,color:"#1e293b"}}>TXN {p.id} · ${p.amount.toFixed(2)}</div>
-              <div style={{fontSize:11,color:"#64748b"}}>{p.network} {p.cardType} · {CHANNEL_LABELS[p.product]||p.product} · Score: <strong style={{color:pr.col}}>{Math.round(ps*100)}</strong></div>
-            </div>
-            <Badge label={`${tc.icon} ${tc.label}`} col={tc.col} bg={tc.bg}/>
+            {isOpen&&(
+              <div style={{padding:"10px 14px",background:"#fff",borderTop:"1px solid #e2e8f0",fontSize:12}}>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:10}}>
+                  {[
+                    ["Amount",`${p.amount.toFixed(2)}`],
+                    ["Channel",CHANNEL_LABELS[p.product]||p.product],
+                    ["Network",p.network],
+                    ["Card type",p.cardType],
+                    ["Billing region",p.addr??'Not provided'],
+                    ["Distance",p.dist!==null?`${p.dist} km`:'Not available'],
+                  ].map(([label,val])=>(
+                    <div key={label} style={{background:"#f8fafc",borderRadius:5,padding:"5px 8px"}}>
+                      <div style={{fontSize:10,color:"#94a3b8",fontWeight:600}}>{label}</div>
+                      <div style={{fontSize:12,color:"#1e293b",fontWeight:500}}>{val}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",marginBottom:5}}>Risk flags</div>
+                <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                  {flags.map((f,fi)=>{
+                    const sc=SEV_CFG[f.severity];
+                    return(
+                      <div key={fi} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 8px",background:sc.bg,borderRadius:5}}>
+                        <span style={{fontSize:9,fontFamily:"monospace",fontWeight:700,color:sc.col,minWidth:36}}>{f.code}</span>
+                        <span style={{fontSize:11,color:"#1e293b",flex:1}}>{f.label}</span>
+                        <span style={{fontSize:9,fontWeight:700,color:sc.col,padding:"1px 6px",borderRadius:8,background:"#fff"}}>{f.severity}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         );
       })}
