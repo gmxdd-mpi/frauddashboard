@@ -21,7 +21,6 @@ const FEAT_LABELS = {
   ProductCD:"Transaction channel (ProductCD)",
   card4:"Card network (card4)",
   card6:"Card type (card6)",
-  addr1:"Billing region code (addr1)",
   dist1:"Distance: billing to transaction, km (dist1)",
 };
 const CHANNEL_LABELS = { W:"Web purchase", C:"Card payment", H:"Home purchase", R:"Retail", S:"Service" };
@@ -45,8 +44,8 @@ function riskLevel(s){
 function getShapEntries(tx){
   if(!tx)return[];
   const shap=REAL_EXPLANATIONS[tx.id]?.shap??{};
-  const vals={TransactionAmt:`$${tx.amount.toFixed(2)}`,ProductCD:CHANNEL_LABELS[tx.product]||tx.product,card4:tx.network,card6:tx.cardType,addr1:tx.addr??'N/A',dist1:tx.dist!==null?`${tx.dist} km`:'N/A'};
-  return Object.entries(shap).map(([k,v])=>({key:k,label:FEAT_LABELS[k]||k,value:vals[k],shap:v})).sort((a,b)=>Math.abs(b.shap)-Math.abs(a.shap));
+  const vals={TransactionAmt:`${tx.amount.toFixed(2)}`,ProductCD:CHANNEL_LABELS[tx.product]||tx.product,card4:tx.network,card6:tx.cardType,dist1:tx.dist!==null?`${tx.dist} km`:'N/A'};
+  return Object.entries(shap).filter(([k])=>k!=="addr1").map(([k,v])=>({key:k,label:FEAT_LABELS[k]||k,value:vals[k],shap:v})).sort((a,b)=>Math.abs(b.shap)-Math.abs(a.shap));
 }
 const FRAUD_RATES = {
   card6: { credit: 6.7, debit: 2.4, "charge card": 0.0, "debit or credit": 0.0 },
@@ -82,6 +81,8 @@ function getLimeEntries(tx){
   if(!tx)return[];
   return Object.entries(REAL_EXPLANATIONS[tx.id]?.lime??{})
     .filter(([rule])=>{
+      // Remove addr1 rules entirely
+      if(/addr1/.test(rule)) return false;
       // Suppress rules that contradict known transaction data
       if(/dist1 <= -1/.test(rule) && tx.dist !== null) return false;
       if(/dist1 > 5/.test(rule) && tx.dist === null) return false;
@@ -142,7 +143,6 @@ const SHAP_TOOLTIPS = {
   ProductCD: "The channel through which the transaction was made — e.g. web purchase or card payment. Some channels are more commonly associated with fraud.",
   card4: "The card network (e.g. Visa, Mastercard). Certain networks appear more frequently in fraudulent transactions in the training data.",
   card6: "Whether the card is a credit or debit card. The model learned that one type is more associated with fraud in this dataset.",
-  addr1: "The billing region code linked to the card. A mismatch between billing region and transaction location can signal fraud.",
   dist1: "The distance in km between the billing address and where the transaction occurred. Large distances can indicate the card is being used away from its owner.",
 };
 
@@ -447,11 +447,10 @@ function TxnPanel({tx}){
   const score=xgbScore(tx);
   const flags=getRiskFlags(tx,score);
   const fields=[
-    {label:"Transaction amount (USD)",value:`$${tx.amount.toFixed(2)}`},
+    {label:"Transaction amount (USD)",value:`${tx.amount.toFixed(2)}`},
     {label:"Channel (ProductCD)",value:CHANNEL_LABELS[tx.product]||tx.product},
     {label:"Card network (card4)",value:tx.network.charAt(0).toUpperCase()+tx.network.slice(1)},
     {label:"Card type (card6)",value:tx.cardType.charAt(0).toUpperCase()+tx.cardType.slice(1)},
-    {label:"Billing region (addr1)",value:tx.addr??'Not provided'},
     {label:"Distance (dist1)",value:tx.dist!==null?`${tx.dist} km`:'Not available'},
   ];
   return(
