@@ -583,46 +583,59 @@ function ClassifyWidget({txId,saved,onSave}){
 
 function ExpRatingWidget({txId,expTab,saved,onSave}){
   const key=`exprating-${txId}-${expTab}`;
-  const [clarity,setClarity]=useState(null);
-  const [completeness,setCompleteness]=useState(null);
+  const [trust,setTrust]=useState(null);
+  const [load,setLoad]=useState(null);
   const [tabStart]=useState(()=>Date.now());
-  useEffect(()=>{setClarity(null);setCompleteness(null);},[txId,expTab]);
-  const allDone=clarity&&completeness;
+  useEffect(()=>{setTrust(null);setLoad(null);},[txId,expTab]);
+  const allDone=trust&&load;
   const alreadySaved=!!saved[key];
+
+  const ScaleRow=({label,value,setValue})=>(
+    <div style={{marginBottom:14}}>
+      <div style={{fontSize:12,color:"#334155",fontWeight:500,marginBottom:8,lineHeight:1.5}}>{label}</div>
+      <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
+        <span style={{fontSize:10,color:"#94a3b8",minWidth:80}}>Strongly disagree</span>
+        {[1,2,3,4,5].map(n=>(
+          <button key={n} onClick={()=>setValue(n)}
+            style={{width:32,height:32,borderRadius:6,border:`1px solid ${value===n?"#2980b9":"#ddd"}`,background:value===n?"#e8f0fe":"#fff",color:value===n?"#2980b9":"#888",fontSize:12,cursor:"pointer",fontWeight:value===n?700:400}}>
+            {n}
+          </button>
+        ))}
+        <span style={{fontSize:10,color:"#94a3b8",minWidth:72}}>Strongly agree</span>
+        <button onClick={()=>setValue("dk")}
+          style={{marginLeft:8,padding:"4px 10px",borderRadius:6,border:`1px solid ${value==="dk"?"#7c3aed":"#ddd"}`,background:value==="dk"?"#ede9fe":"#fff",color:value==="dk"?"#7c3aed":"#888",fontSize:11,cursor:"pointer",fontWeight:value==="dk"?600:400}}>
+          I don't know
+        </button>
+      </div>
+    </div>
+  );
+
   return(
     <div style={{marginTop:12,padding:"12px 14px",background:"#f8fafc",borderRadius:8,border:"1px solid #e2e8f0"}}>
-      <div style={{fontSize:11,fontWeight:600,color:"#475569",marginBottom:10}}>Rate this explanation — {expTab}</div>
+      <div style={{fontSize:11,fontWeight:600,color:"#475569",marginBottom:12}}>Rate this explanation — {expTab}</div>
       {alreadySaved?(
         <div style={{fontSize:12,color:"#166534",fontWeight:500}}>
-          ✓ Rated: Clarity <strong>{saved[key].clarity}/5</strong> · Completeness <strong>{saved[key].completeness}/5</strong>
+          ✓ Rated: Trust <strong>{saved[key].trust}</strong> · Mental load <strong>{saved[key].mental_load}</strong>
         </div>
       ):(
         <>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:10}}>
-            <div>
-              <div style={{fontSize:11,color:"#64748b",marginBottom:5}}>Clarity (1–5)</div>
-              <div style={{display:"flex",gap:4,alignItems:"center"}}>
-                <span style={{fontSize:9,color:"#bbb"}}>Unclear</span>
-                {[1,2,3,4,5].map(n=>(<button key={n} onClick={()=>setClarity(n)} style={{width:28,height:28,borderRadius:5,border:`1px solid ${clarity===n?"#2980b9":"#ddd"}`,background:clarity===n?"#e8f0fe":"#fff",color:clarity===n?"#2980b9":"#888",fontSize:12,cursor:"pointer"}}>{n}</button>))}
-                <span style={{fontSize:9,color:"#bbb"}}>Clear</span>
-              </div>
-            </div>
-            <div>
-              <div style={{fontSize:11,color:"#64748b",marginBottom:5}}>Completeness (1–5)</div>
-              <div style={{display:"flex",gap:4,alignItems:"center"}}>
-                <span style={{fontSize:9,color:"#bbb"}}>Incomplete</span>
-                {[1,2,3,4,5].map(n=>(<button key={n} onClick={()=>setCompleteness(n)} style={{width:28,height:28,borderRadius:5,border:`1px solid ${completeness===n?"#2980b9":"#ddd"}`,background:completeness===n?"#e8f0fe":"#fff",color:completeness===n?"#2980b9":"#888",fontSize:12,cursor:"pointer"}}>{n}</button>))}
-                <span style={{fontSize:9,color:"#bbb"}}>Complete</span>
-              </div>
-            </div>
-          </div>
-          <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <button onClick={()=>onSave(key,{clarity,completeness,exp:expTab,transaction_id:txId,tab_time_s:Math.round((Date.now()-tabStart)/1000)})}
+          <ScaleRow
+            label="1. With this explanation, I trust this AI in assessing whether the transaction is fraudulent."
+            value={trust}
+            setValue={setTrust}
+          />
+          <ScaleRow
+            label="2. This explanation reduced the mental load needed to understand the logic of the AI making the inputs."
+            value={load}
+            setValue={setLoad}
+          />
+          <div style={{display:"flex",alignItems:"center",gap:10,marginTop:4}}>
+            <button onClick={()=>onSave(key,{trust,mental_load:load,exp:expTab,transaction_id:txId,tab_time_s:Math.round((Date.now()-tabStart)/1000)})}
               disabled={!allDone}
               style={{padding:"6px 16px",borderRadius:7,border:`1px solid ${allDone?"#2980b9":"#ccc"}`,background:allDone?"#e8f0fe":"#f5f5f5",color:allDone?"#2980b9":"#aaa",fontSize:12,cursor:allDone?"pointer":"default",fontWeight:500}}>
               Save rating →
             </button>
-            {!allDone&&<span style={{fontSize:11,color:"#bbb"}}>Rate both dimensions to save</span>}
+            {!allDone&&<span style={{fontSize:11,color:"#bbb"}}>Answer both questions to save</span>}
           </div>
         </>
       )}
