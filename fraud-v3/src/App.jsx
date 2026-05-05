@@ -128,6 +128,7 @@ function getLimeEntries(tx){
   if(!tx)return[];
   return Object.entries(REAL_EXPLANATIONS[tx.id]?.lime??{})
     .filter(([rule])=>{
+      if(/addr1/.test(rule)) return false;
       if(/dist1 <= -1/.test(rule) && tx.dist !== null) return false;
       if(/dist1 > 5/.test(rule) && tx.dist === null) return false;
       if(/TransactionAmt > 125/.test(rule) && tx.amount <= 125) return false;
