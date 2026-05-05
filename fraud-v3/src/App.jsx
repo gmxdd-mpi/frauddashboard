@@ -356,7 +356,7 @@ Write in plain English as if briefing a colleague. Do not use bullet points, tec
 
 function CounterfactualPanel({tx}){
   const shap=REAL_EXPLANATIONS[tx.id]?.shap??{};
-  const riskDrivers=Object.entries(shap).filter(([k],[v])=>v>0&&k!=="addr1").sort((a,b)=>b[1]-a[1]);
+  const riskDrivers=Object.entries(shap).filter(([k,v])=>v>0&&k!=="addr1").sort((a,b)=>b[1]-a[1]);
   const advice={
     TransactionAmt:{required:"Lower transaction amount",feasible:false,reason:"Cannot be changed retroactively"},
     ProductCD:     {required:"Different transaction channel",feasible:false,reason:"Cannot be changed retroactively"},
