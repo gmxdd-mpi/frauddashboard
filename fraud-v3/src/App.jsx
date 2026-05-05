@@ -620,14 +620,14 @@ function ExpRatingWidget({txId,expTab,saved,onSave}){
       ):(
         <>
           <ScaleRow
-            label="1. With this explanation, I trust this AI in assessing whether the transaction is fraudulent."
-            value={trust}
-            setValue={setTrust}
-          />
-          <ScaleRow
-            label="2. This explanation reduced the mental load needed to understand the logic of the AI making the inputs."
+            label="1. This explanation makes it easier to understand how the AI makes its decisions."
             value={load}
             setValue={setLoad}
+          />
+          <ScaleRow
+            label="2. This explanation increases my trust in the AI's assessment of whether a transaction is fraudulent."
+            value={trust}
+            setValue={setTrust}
           />
           <div style={{display:"flex",alignItems:"center",gap:10,marginTop:4}}>
             <button onClick={()=>onSave(key,{trust,mental_load:load,exp:expTab,transaction_id:txId,tab_time_s:Math.round((Date.now()-tabStart)/1000)})}
