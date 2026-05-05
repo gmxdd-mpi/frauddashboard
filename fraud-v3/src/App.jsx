@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 
 const ALL_TXN = [
-  { id:"3053108", amount:152.51, product:"C", network:"visa", cardType:"credit", addr:null, dist:null, groundTruth:"confirmed_fraud" },
-  { id:"3354853", amount:25.95,  product:"W", network:"visa", cardType:"debit",  addr:324,  dist:8,    groundTruth:"legitimate"      },
-  { id:"3492704", amount:230.18, product:"C", network:"visa", cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" },
-  { id:"3557070", amount:29.00,  product:"W", network:"visa", cardType:"debit",  addr:325,  dist:8,    groundTruth:"legitimate"      },
+  { id:"3053108", amount:152.51, product:"C", network:"visa", cardType:"credit", dist:null, groundTruth:"confirmed_fraud" },
+  { id:"3354853", amount:25.95,  product:"W", network:"visa", cardType:"debit",  dist:8,    groundTruth:"legitimate"      },
+  { id:"3492704", amount:230.18, product:"C", network:"visa", cardType:"debit",  dist:null, groundTruth:"confirmed_fraud" },
+  { id:"3557070", amount:29.00,  product:"W", network:"visa", cardType:"debit",  dist:8,    groundTruth:"legitimate"      },
 ];
 
 const PEER_POOLS = {
@@ -145,7 +145,6 @@ function getRiskFlags(tx,score){
   if(tx.amount>150)                            f.push({code:"RF-02",label:"Transaction amount above threshold",severity:"HIGH"});
   if(tx.dist!==null&&tx.dist>100)              f.push({code:"RF-03",label:"Suspicious transaction distance",severity:"HIGH"});
   if(tx.dist!==null&&tx.dist>20&&tx.dist<=100) f.push({code:"RF-03",label:"Elevated transaction distance",severity:"MED"});
-  if(tx.addr===null)                           f.push({code:"RF-04",label:"Billing address not confirmed",severity:"MED"});
   if(tx.product==="C"&&score>0.3)              f.push({code:"RF-05",label:"Card payment — elevated risk pattern",severity:"MED"});
   if(tx.product==="W"&&tx.dist!==null&&tx.dist>5) f.push({code:"RF-06",label:"Web purchase with distance anomaly",severity:"MED"});
   if(score>=0.4&&score<0.7)                    f.push({code:"RF-07",label:"Medium fraud score — review required",severity:"MED"});
@@ -581,10 +580,11 @@ function ClassifyWidget({txId,saved,onSave}){
   );
 }
 
-function ExpRatingWidget({txId,expTab,expTabId,saved,onSave,onNext,isLastTab}){
+function ExpRatingWidget({txId,expTab,saved,onSave}){
   const key=`exprating-${txId}-${expTab}`;
   const [clarity,setClarity]=useState(null);
   const [completeness,setCompleteness]=useState(null);
+  const [tabStart]=useState(()=>Date.now());
   useEffect(()=>{setClarity(null);setCompleteness(null);},[txId,expTab]);
   const allDone=clarity&&completeness;
   const alreadySaved=!!saved[key];
@@ -616,7 +616,7 @@ function ExpRatingWidget({txId,expTab,expTabId,saved,onSave,onNext,isLastTab}){
             </div>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <button onClick={()=>onSave(key,{clarity,completeness,exp:expTab,transaction_id:txId})}
+            <button onClick={()=>onSave(key,{clarity,completeness,exp:expTab,transaction_id:txId,tab_time_s:Math.round((Date.now()-tabStart)/1000)})}
               disabled={!allDone}
               style={{padding:"6px 16px",borderRadius:7,border:`1px solid ${allDone?"#2980b9":"#ccc"}`,background:allDone?"#e8f0fe":"#f5f5f5",color:allDone?"#2980b9":"#aaa",fontSize:12,cursor:allDone?"pointer":"default",fontWeight:500}}>
               Save rating →
@@ -629,7 +629,7 @@ function ExpRatingWidget({txId,expTab,expTabId,saved,onSave,onNext,isLastTab}){
   );
 }
 
-function SummaryWidget({txId,initialClass,saved,onSave}){
+function SummaryWidget({txId,initialClass,saved,onSave,txStart}){
   const key=`summary-${txId}`;
   const [reclassify,setReclassify]=useState(null);
   const [bestExp,setBestExp]=useState(null);
@@ -693,6 +693,7 @@ export default function App(){
   const [txnOrder]=useState(()=>shuffle(ALL_TXN));
   const [tabOrder]=useState(()=>shuffle(EXP_TAB_IDS));
   const [expTab,setExpTab]=useState(()=>tabOrder[0]);
+  const [txStartTimes,setTxStartTimes]=useState({[0]:Date.now()});
 
   const tx=txnOrder[selected];
   const score=xgbScore(tx);
@@ -741,7 +742,7 @@ export default function App(){
             const done=!!saved[`summary-${t.id}`];
             const isCurrent=selected===i;
             return(
-              <button key={t.id} onClick={()=>{setSelected(i);setExpTab(tabOrder[0]);}}
+              <button key={t.id} onClick={()=>{setSelected(i);setExpTab(tabOrder[0]);setTxStartTimes(s=>({...s,[i]:s[i]??Date.now()}));}}
                 style={{flex:1,padding:"10px 8px",borderRadius:8,border:`2px solid ${isCurrent?"#2980b9":done?"#1a7a4a":"#e0e0e0"}`,background:isCurrent?"#eff6ff":done?"#f0fdf4":"#fafafa",cursor:"pointer",textAlign:"center"}}>
                 <div style={{fontSize:14,fontWeight:700,color:isCurrent?"#2980b9":done?"#1a7a4a":"#555"}}>TXN {i+1}</div>
                 <div style={{fontSize:10,color:isCurrent?"#2980b9":done?"#1a7a4a":"#94a3b8",marginTop:2}}>{done?"✓ Done":isCurrent?"In progress":"Not started"}</div>
@@ -794,7 +795,7 @@ export default function App(){
               {expTab==="llm"            &&<LLMPanel key={tx.id} tx={tx} score={score}/>}
               {expTab==="counterfactual" &&<CounterfactualPanel tx={tx}/>}
               {expTab==="peers"          &&<PeersPanel tx={tx}/>}
-              <ExpRatingWidget txId={tx.id} expTab={TAB_ID_TO_LABEL[expTab]||expTab} expTabId={expTab} saved={saved} onSave={handleSave} onNext={goToNextTab} isLastTab={isLastTab}/>
+              <ExpRatingWidget txId={tx.id} expTab={TAB_ID_TO_LABEL[expTab]||expTab} saved={saved} onSave={handleSave}/>
             </div>
           </div>
           {classified&&!allExpRated&&(
@@ -804,7 +805,7 @@ export default function App(){
             </div>
           )}
           {classified&&allExpRated&&(
-            <SummaryWidget txId={tx.id} initialClass={initialClass} saved={saved} onSave={handleSave}/>
+            <SummaryWidget txId={tx.id} initialClass={initialClass} saved={saved} onSave={handleSave} txStart={txStartTimes[selected]??Date.now()}/>
           )}
           {summarised&&(
             <div style={{padding:"12px 14px",background:"#eff6ff",borderRadius:8,border:"1px solid #bfdbfe",fontSize:13,color:"#1e40af",textAlign:"center"}}>
