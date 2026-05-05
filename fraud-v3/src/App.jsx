@@ -7,16 +7,44 @@ const ALL_TXN = [
   { id:"3557070", amount:29.00,  product:"W", network:"visa", cardType:"debit",  addr:325,  dist:8,    groundTruth:"legitimate"      },
 ];
 
-const PEER_POOL = [
-  { id:"3041132", amount:44.00,  product:"W", network:"visa", cardType:"debit",  dist:null, groundTruth:"confirmed_fraud" },
-  { id:"3513937", amount:59.00,  product:"W", network:"visa", cardType:"debit",  dist:959,  groundTruth:"confirmed_fraud" },
-  { id:"3344148", amount:25.00,  product:"W", network:"visa", cardType:"debit",  dist:null, groundTruth:"confirmed_fraud" },
-  { id:"3482177", amount:39.47,  product:"C", network:"visa", cardType:"credit", dist:null, groundTruth:"confirmed_fraud" },
-  { id:"3139055", amount:66.46,  product:"C", network:"visa", cardType:"credit", dist:null, groundTruth:"confirmed_fraud" },
-  { id:"3018989", amount:57.95,  product:"W", network:"visa", cardType:"debit",  dist:4,    groundTruth:"legitimate"      },
-  { id:"3312150", amount:149.95, product:"W", network:"visa", cardType:"debit",  dist:15,   groundTruth:"legitimate"      },
-  { id:"3053086", amount:49.00,  product:"W", network:"visa", cardType:"debit",  dist:null, groundTruth:"legitimate"      },
-];
+const PEER_POOLS = {
+  // False Negative — model missed fraud. Peers show similar transactions that WERE caught as fraud,
+  // nudging analysts to question why this one scored so low.
+  "3053108": [
+    { id:"3521091", amount:157.39, product:"C", network:"visa", cardType:"debit",  dist:null, groundTruth:"confirmed_fraud" },
+    { id:"3314821", amount:134.13, product:"C", network:"visa", cardType:"debit",  dist:null, groundTruth:"confirmed_fraud" },
+    { id:"3371282", amount:106.04, product:"C", network:"visa", cardType:"debit",  dist:null, groundTruth:"confirmed_fraud" },
+    { id:"3115753", amount:130.13, product:"C", network:"visa", cardType:"credit", dist:null, groundTruth:"confirmed_fraud" },
+    { id:"3431490", amount:83.67,  product:"C", network:"visa", cardType:"credit", dist:null, groundTruth:"legitimate"      },
+  ],
+  // False Positive — model wrongly flagged legit. Peers are mostly legit,
+  // helping analysts push back on the high score.
+  "3354853": [
+    { id:"3565025", amount:57.95,  product:"W", network:"visa", cardType:"debit",  dist:7,    groundTruth:"confirmed_fraud" },
+    { id:"3211183", amount:58.95,  product:"W", network:"visa", cardType:"debit",  dist:8,    groundTruth:"legitimate"      },
+    { id:"3223916", amount:47.95,  product:"W", network:"visa", cardType:"debit",  dist:2,    groundTruth:"legitimate"      },
+    { id:"3510290", amount:39.00,  product:"W", network:"visa", cardType:"debit",  dist:1,    groundTruth:"legitimate"      },
+    { id:"3044069", amount:59.00,  product:"W", network:"visa", cardType:"debit",  dist:19,   groundTruth:"legitimate"      },
+  ],
+  // True Positive — correctly caught fraud. Peers are mostly fraud,
+  // confirming the analyst's suspicion.
+  "3492704": [
+    { id:"3521091", amount:157.39, product:"C", network:"visa", cardType:"debit",  dist:null, groundTruth:"confirmed_fraud" },
+    { id:"3314821", amount:134.13, product:"C", network:"visa", cardType:"debit",  dist:null, groundTruth:"confirmed_fraud" },
+    { id:"3371282", amount:106.04, product:"C", network:"visa", cardType:"debit",  dist:null, groundTruth:"confirmed_fraud" },
+    { id:"3074287", amount:54.10,  product:"C", network:"visa", cardType:"debit",  dist:null, groundTruth:"confirmed_fraud" },
+    { id:"3202734", amount:40.97,  product:"C", network:"visa", cardType:"debit",  dist:null, groundTruth:"legitimate"      },
+  ],
+  // True Negative — correctly cleared legit. Peers are mostly legit,
+  // confirming it is safe to approve.
+  "3557070": [
+    { id:"3211183", amount:58.95,  product:"W", network:"visa", cardType:"debit",  dist:8,    groundTruth:"legitimate"      },
+    { id:"3223916", amount:47.95,  product:"W", network:"visa", cardType:"debit",  dist:2,    groundTruth:"legitimate"      },
+    { id:"3510290", amount:39.00,  product:"W", network:"visa", cardType:"debit",  dist:1,    groundTruth:"legitimate"      },
+    { id:"3044069", amount:59.00,  product:"W", network:"visa", cardType:"debit",  dist:19,   groundTruth:"legitimate"      },
+    { id:"3565025", amount:57.95,  product:"W", network:"visa", cardType:"debit",  dist:7,    groundTruth:"confirmed_fraud" },
+  ],
+};
 
 const REAL_EXPLANATIONS = {
   "3053108":{ score:0.0096, shap:{TransactionAmt:-0.4179,ProductCD:0.3726,card4:-0.3341,card6:-2.195,addr1:-0.5997,dist1:-1.4414}, lime:{"card6 <= 1.00":-0.1449,"ProductCD <= 3.00":0.1068,"dist1 > 5.00":-0.0815,"184.00 < addr1 <= 272.00":0.0237,"card4 <= 2.00":-0.0144,"68.77 < TransactionAmt <= 125.00":0.001} },
@@ -25,7 +53,7 @@ const REAL_EXPLANATIONS = {
   "3557070":{ score:0.015,  shap:{TransactionAmt:-2.1688,ProductCD:0.0755,card4:-0.2918,card6:0.0731,addr1:-0.3374,dist1:-1.5203}, lime:{"card6 <= 1.00":-0.1369,"TransactionAmt <= 43.32":-0.1098,"ProductCD <= 3.00":0.0983,"dist1 > 5.00":-0.0859,"272.00 < addr1 <= 327.00":0.0252,"card4 <= 2.00":-0.0128} },
 };
 
-const SHEET_URL = "https://script.google.com/macros/s/AKfycbw40D7CtJKFxD7H8w0BGUVBKVxVhBssaKYzjGTZaim2EJyBiN6lmw135ceAEzuAcDp1OA/exec";
+const SHEET_URL = "YOUR_NEW_GOOGLE_APPS_SCRIPT_URL_HERE";
 
 const FEAT_LABELS = {
   TransactionAmt:"Transaction amount (USD)",
@@ -58,33 +86,41 @@ function getShapEntries(tx){
   const vals={TransactionAmt:`${tx.amount.toFixed(2)}`,ProductCD:CHANNEL_LABELS[tx.product]||tx.product,card4:tx.network,card6:tx.cardType,dist1:tx.dist!==null?`${tx.dist} km`:'N/A'};
   return Object.entries(shap).filter(([k])=>k!=="addr1").map(([k,v])=>({key:k,label:FEAT_LABELS[k]||k,value:vals[k],shap:v})).sort((a,b)=>Math.abs(b.shap)-Math.abs(a.shap));
 }
+
 const FRAUD_RATES = {
   card6: { credit: 6.7, debit: 2.4, "charge card": 0.0, "debit or credit": 0.0 },
   card4: { visa: 3.5, mastercard: 3.4, discover: 7.7, "american express": 2.9 },
   ProductCD: { C: 11.7, H: 4.8, R: 3.8, S: 5.9, W: 2.0 },
 };
 
+// Contextual descriptions for channels
+const CHANNEL_CONTEXT = {
+  C: "Card payments have the highest fraud rate in this dataset at 11.7% — nearly 6× higher than web purchases",
+  W: "Web purchases have the lowest fraud rate in this dataset at 2.0% — a relatively low-risk channel",
+  H: "Home purchases have a 4.8% fraud rate in this dataset",
+  R: "Retail transactions have a 3.8% fraud rate in this dataset",
+  S: "Service transactions have a 5.9% fraud rate in this dataset",
+};
+
 function annotateLimeRule(rule, tx){
   const channel = CHANNEL_LABELS[tx.product] || tx.product;
   const network = tx.network.toLowerCase();
   const cardType = tx.cardType.toLowerCase();
-  const addr = tx.addr ?? "unknown";
-
   const cardTypeRate = FRAUD_RATES.card6[cardType];
   const networkRate = FRAUD_RATES.card4[network];
-  const channelRate = FRAUD_RATES.ProductCD[tx.product];
+  const channelContext = CHANNEL_CONTEXT[tx.product] || `${channel} transactions were factored in by the model`;
 
-  if(/TransactionAmt > 125/.test(rule))          return "Amount is high — above the typical threshold for this channel";
-  if(/TransactionAmt <= 43/.test(rule))           return "Amount is low — well within the normal range for this channel";
-  if(/68\.77 < TransactionAmt <= 125/.test(rule)) return "Amount is moderate — within a common mid-range band";
-  if(/card6 <= 1/.test(rule))                     return `Card type is ${tx.cardType} — ${cardTypeRate}% of ${tx.cardType} card transactions in the training data were fraudulent`;
-  if(/card4 <= 2/.test(rule))                     return `Card network is ${tx.network} — ${networkRate}% of ${tx.network} transactions in the training data were fraudulent`;
-  if(/ProductCD <= 3/.test(rule))                 return `Transaction channel is ${channel} — ${channelRate}% of ${channel.toLowerCase()} transactions in the training data were fraudulent`;
-  if(/dist1 > 5/.test(rule))                      return "Transaction occurred notably far from the billing address — a potential sign the card is being used away from its owner";
-  if(/dist1 <= -1/.test(rule))                    return "No distance data available — the transaction location could not be compared against the billing address";
-  if(/addr1 <= 184/.test(rule))                   return `Billing region code is ${addr} — the model weighted this region when scoring this transaction`;
-  if(/184\.00 < addr1 <= 272/.test(rule))         return `Billing region code is ${addr} — the model weighted this region when scoring this transaction`;
-  if(/272\.00 < addr1 <= 327/.test(rule))         return `Billing region code is ${addr} — the model weighted this region when scoring this transaction`;
+  if(/TransactionAmt > 125/.test(rule))           return "Amount is high — above the typical threshold for this channel";
+  if(/TransactionAmt <= 43/.test(rule))            return "Amount is low — well within the normal range for this channel";
+  if(/68\.77 < TransactionAmt <= 125/.test(rule))  return "Amount is moderate — within a common mid-range band";
+  if(/card6 <= 1/.test(rule))                      return `Card type is ${tx.cardType} — ${cardTypeRate}% of ${tx.cardType} card transactions in the training data were fraudulent`;
+  if(/card4 <= 2/.test(rule))                      return `Card network is ${tx.network} — ${networkRate}% of ${tx.network} transactions in the training data were fraudulent`;
+  if(/ProductCD <= 3/.test(rule))                  return channelContext;
+  if(/dist1 > 5/.test(rule))                       return `Distance is ${tx.dist}km — the model factored in that distance data was present for this transaction`;
+  if(/dist1 <= -1/.test(rule))                     return "Distance data unavailable — transaction location could not be compared against the billing address";
+  if(/addr1 <= 184/.test(rule))                    return "Billing region is in the lower range — the model weighted this when scoring the transaction";
+  if(/184\.00 < addr1 <= 272/.test(rule))          return "Billing region is in the mid range — the model weighted this when scoring the transaction";
+  if(/272\.00 < addr1 <= 327/.test(rule))          return "Billing region is in the higher range — the model weighted this when scoring the transaction";
   return null;
 }
 
@@ -92,9 +128,6 @@ function getLimeEntries(tx){
   if(!tx)return[];
   return Object.entries(REAL_EXPLANATIONS[tx.id]?.lime??{})
     .filter(([rule])=>{
-      // Remove addr1 rules entirely
-      if(/addr1/.test(rule)) return false;
-      // Suppress rules that contradict known transaction data
       if(/dist1 <= -1/.test(rule) && tx.dist !== null) return false;
       if(/dist1 > 5/.test(rule) && tx.dist === null) return false;
       if(/TransactionAmt > 125/.test(rule) && tx.amount <= 125) return false;
@@ -105,6 +138,7 @@ function getLimeEntries(tx){
     .map(([k,v])=>({rule:k, annotation:annotateLimeRule(k,tx), v}))
     .sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));
 }
+
 function getRiskFlags(tx,score){
   const f=[];
   if(score>=0.7)                               f.push({code:"RF-01",label:"High fraud score",severity:"HIGH"});
@@ -163,11 +197,8 @@ function ShapTooltip({featureKey}){
   if(!tip) return null;
   return(
     <span style={{position:"relative",display:"inline-flex",alignItems:"center",marginLeft:5}}>
-      <span
-        onMouseEnter={()=>setVis(true)}
-        onMouseLeave={()=>setVis(false)}
-        style={{width:15,height:15,borderRadius:"50%",background:"#cbd5e1",color:"#475569",fontSize:10,fontWeight:700,display:"inline-flex",alignItems:"center",justifyContent:"center",cursor:"default",flexShrink:0,lineHeight:1}}
-      >?</span>
+      <span onMouseEnter={()=>setVis(true)} onMouseLeave={()=>setVis(false)}
+        style={{width:15,height:15,borderRadius:"50%",background:"#cbd5e1",color:"#475569",fontSize:10,fontWeight:700,display:"inline-flex",alignItems:"center",justifyContent:"center",cursor:"default",flexShrink:0,lineHeight:1}}>?</span>
       {vis&&(
         <span style={{position:"absolute",left:"50%",bottom:"calc(100% + 6px)",transform:"translateX(-50%)",background:"#1e293b",color:"#f8fafc",fontSize:11,lineHeight:1.5,padding:"7px 10px",borderRadius:7,width:220,zIndex:100,boxShadow:"0 4px 12px rgba(0,0,0,0.18)",pointerEvents:"none"}}>
           {tip}
@@ -266,18 +297,19 @@ function LimePanel({tx}){
 }
 
 function LLMPanel({tx,score}){
-  const [text,setText]=useState("");const [loading,setLoading]=useState(false);
-  const [error,setError]=useState("");const [done,setDone]=useState(false);
+  const [text,setText]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [error,setError]=useState("");
+  const [done,setDone]=useState(false);
   const [showPrompt,setShowPrompt]=useState(false);
 
   const r=riskLevel(score);
   const prompt=`You are an expert fraud analyst writing a case summary for a colleague who will decide whether to approve, flag, or block a transaction.
 
 Transaction details:
-- Amount: ${tx.amount.toFixed(2)}
+- Amount: $${tx.amount.toFixed(2)}
 - Channel: ${CHANNEL_LABELS[tx.product]||tx.product}
 - Card: ${tx.network} ${tx.cardType}
-- Billing region: ${tx.addr??"not provided"}
 - Distance from billing address: ${tx.dist!==null?tx.dist+" km":"unavailable"}
 - Fraud risk score: ${Math.round(score*100)} out of 100 (${r.text})
 
@@ -324,13 +356,12 @@ Write in plain English as if briefing a colleague. Do not use bullet points, tec
 
 function CounterfactualPanel({tx}){
   const shap=REAL_EXPLANATIONS[tx.id]?.shap??{};
-  const riskDrivers=Object.entries(shap).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  const riskDrivers=Object.entries(shap).filter(([k],[v])=>v>0&&k!=="addr1").sort((a,b)=>b[1]-a[1]);
   const advice={
     TransactionAmt:{required:"Lower transaction amount",feasible:false,reason:"Cannot be changed retroactively"},
     ProductCD:     {required:"Different transaction channel",feasible:false,reason:"Cannot be changed retroactively"},
     card4:         {required:"Verify card ownership with issuer",feasible:true,reason:"Analyst can contact card issuer"},
     card6:         {required:"Verify card type matches account",feasible:true,reason:"Analyst can check account records"},
-    addr1:         {required:"Confirm billing address on file",feasible:true,reason:"Analyst can request cardholder verification"},
     dist1:         {required:"Cardholder confirms travel or foreign purchase",feasible:true,reason:"Analyst can contact cardholder"},
   };
   if(!riskDrivers.length)return<div style={{fontSize:13,color:"#888",padding:"12px 0"}}>No risk-increasing features for this transaction.</div>;
@@ -350,7 +381,7 @@ function CounterfactualPanel({tx}){
         <tbody>
           {riskDrivers.slice(0,5).map(([k,v],i)=>{
             const a=advice[k]||{required:"No clear counterfactual",feasible:false,reason:""};
-            const valMap={TransactionAmt:`$${tx.amount.toFixed(2)}`,ProductCD:CHANNEL_LABELS[tx.product]||tx.product,card4:tx.network,card6:tx.cardType,addr1:tx.addr??'N/A',dist1:tx.dist!==null?`${tx.dist} km`:'N/A'};
+            const valMap={TransactionAmt:`$${tx.amount.toFixed(2)}`,ProductCD:CHANNEL_LABELS[tx.product]||tx.product,card4:tx.network,card6:tx.cardType,dist1:tx.dist!==null?`${tx.dist} km`:'N/A'};
             return(
               <tr key={i} style={{background:i%2===0?"#fff":"#f8fafc"}}>
                 <td style={{padding:"8px 10px",fontWeight:500,color:"#1e293b"}}>{FEAT_LABELS[k]||k}</td>
@@ -370,7 +401,8 @@ function CounterfactualPanel({tx}){
 }
 
 function PeersPanel({tx}){
-  const others=PEER_POOL.map(p=>{
+  const pool = PEER_POOLS[tx.id] || [];
+  const others = pool.map(p=>{
     let sim=0;
     if(p.product===tx.product)sim+=25;
     if(p.network===tx.network)sim+=20;
@@ -422,11 +454,10 @@ function PeersPanel({tx}){
               <div style={{padding:"10px 14px",background:"#fff",borderTop:"1px solid #e2e8f0",fontSize:12}}>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:10}}>
                   {[
-                    ["Amount",`${p.amount.toFixed(2)}`],
+                    ["Amount",`$${p.amount.toFixed(2)}`],
                     ["Channel",CHANNEL_LABELS[p.product]||p.product],
                     ["Network",p.network],
                     ["Card type",p.cardType],
-                    ["Billing region",p.addr??'Not provided'],
                     ["Distance",p.dist!==null?`${p.dist} km`:'Not available'],
                   ].map(([label,val])=>(
                     <div key={label} style={{background:"#f8fafc",borderRadius:5,padding:"5px 8px"}}>
@@ -461,7 +492,7 @@ function TxnPanel({tx}){
   const score=xgbScore(tx);
   const flags=getRiskFlags(tx,score);
   const fields=[
-    {label:"Transaction amount (USD)",value:`${tx.amount.toFixed(2)}`},
+    {label:"Transaction amount (USD)",value:`$${tx.amount.toFixed(2)}`},
     {label:"Channel (ProductCD)",value:CHANNEL_LABELS[tx.product]||tx.product},
     {label:"Card network (card4)",value:tx.network.charAt(0).toUpperCase()+tx.network.slice(1)},
     {label:"Card type (card6)",value:tx.cardType.charAt(0).toUpperCase()+tx.cardType.slice(1)},
@@ -550,24 +581,21 @@ function ClassifyWidget({txId,saved,onSave}){
   );
 }
 
-function ExpRatingWidget({txId, expTab, expTabId, saved, onSave, onNext, isLastTab}){
+function ExpRatingWidget({txId,expTab,expTabId,saved,onSave,onNext,isLastTab}){
   const key=`exprating-${txId}-${expTab}`;
   const [clarity,setClarity]=useState(null);
   const [completeness,setCompleteness]=useState(null);
   useEffect(()=>{setClarity(null);setCompleteness(null);},[txId,expTab]);
-
   const allDone=clarity&&completeness;
   const alreadySaved=!!saved[key];
-
   return(
     <div style={{marginTop:12,padding:"12px 14px",background:"#f8fafc",borderRadius:8,border:"1px solid #e2e8f0"}}>
       <div style={{fontSize:11,fontWeight:600,color:"#475569",marginBottom:10}}>Rate this explanation — {expTab}</div>
-
-      {alreadySaved ? (
+      {alreadySaved?(
         <div style={{fontSize:12,color:"#166534",fontWeight:500}}>
           ✓ Rated: Clarity <strong>{saved[key].clarity}/5</strong> · Completeness <strong>{saved[key].completeness}/5</strong>
         </div>
-      ) : (
+      ):(
         <>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:10}}>
             <div>
@@ -678,20 +706,15 @@ export default function App(){
 
   const currentTabIdx=tabOrder.indexOf(expTab);
   const isLastTab=currentTabIdx===tabOrder.length-1;
-  const goToNextTab=()=>{
-    if(!isLastTab) setExpTab(tabOrder[currentTabIdx+1]);
-  };
+  const goToNextTab=()=>{ if(!isLastTab) setExpTab(tabOrder[currentTabIdx+1]); };
 
   const handleSave=(k,d)=>{
     setSaved(s=>({...s,[k]:d}));
     fetch(SHEET_URL,{method:"POST",body:JSON.stringify({participant_id:participantId,key:k,...d})}).catch(()=>{});
-    // Auto-advance to next explanation tab after rating
-    if(k.startsWith("exprating-")&&!isLastTab){
-      goToNextTab();
-    }
+    if(k.startsWith("exprating-")&&!isLastTab) goToNextTab();
   };
 
-            const completedCount=txnOrder.filter(t=>saved[`summary-${t.id}`]).length;
+  const completedCount=txnOrder.filter(t=>saved[`summary-${t.id}`]).length;
 
   return(
     <div style={{fontFamily:"system-ui,sans-serif",padding:"1rem",maxWidth:1300,margin:"0 auto"}}>
@@ -734,11 +757,8 @@ export default function App(){
 
       <div style={{display:"grid",gridTemplateColumns:"300px 1fr",gap:12,alignItems:"start"}}>
         <TxnPanel tx={tx}/>
-
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           <ClassifyWidget txId={tx.id} saved={saved} onSave={handleSave}/>
-
-          {/* Step 2: explanations */}
           <div style={{background:"#fff",border:`1px solid ${classified?"#e8e8e8":"#f1f5f9"}`,borderRadius:10,padding:"14px",position:"relative"}}>
             {!classified&&(
               <div style={{position:"absolute",inset:0,background:"rgba(248,250,252,0.92)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",zIndex:10}}>
@@ -774,30 +794,18 @@ export default function App(){
               {expTab==="llm"            &&<LLMPanel key={tx.id} tx={tx} score={score}/>}
               {expTab==="counterfactual" &&<CounterfactualPanel tx={tx}/>}
               {expTab==="peers"          &&<PeersPanel tx={tx}/>}
-              <ExpRatingWidget
-                txId={tx.id}
-                expTab={TAB_ID_TO_LABEL[expTab]||expTab}
-                expTabId={expTab}
-                saved={saved}
-                onSave={handleSave}
-                onNext={goToNextTab}
-                isLastTab={isLastTab}
-              />
+              <ExpRatingWidget txId={tx.id} expTab={TAB_ID_TO_LABEL[expTab]||expTab} expTabId={expTab} saved={saved} onSave={handleSave} onNext={goToNextTab} isLastTab={isLastTab}/>
             </div>
           </div>
-
-          {/* Step 3: locked until all 5 rated */}
           {classified&&!allExpRated&&(
             <div style={{padding:"10px 14px",background:"#fefce8",border:"1px solid #fde68a",borderRadius:8,fontSize:12,color:"#92400e"}}>
               📋 Rate all 5 explanations in Step 2 to unlock the final evaluation.
               <span style={{marginLeft:6,color:"#b45309",fontWeight:600}}>{ratedCount}/5 rated</span>
             </div>
           )}
-
           {classified&&allExpRated&&(
             <SummaryWidget txId={tx.id} initialClass={initialClass} saved={saved} onSave={handleSave}/>
           )}
-
           {summarised&&(
             <div style={{padding:"12px 14px",background:"#eff6ff",borderRadius:8,border:"1px solid #bfdbfe",fontSize:13,color:"#1e40af",textAlign:"center"}}>
               ✓ Transaction {selected+1} complete.{selected<ALL_TXN.length-1?" Click the next transaction above to continue.":" You have completed all 4 transactions. Thank you!"}
