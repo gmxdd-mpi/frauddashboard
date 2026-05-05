@@ -564,7 +564,7 @@ function ClassifyWidget({txId,saved,onSave}){
         </div>
       </div>
       <div style={{marginBottom:12}}>
-        <div style={{fontSize:11,color:"#475569",marginBottom:6,fontWeight:500}}>Confidence in your classification (1 = not confident · 7 = very confident)</div>
+        <div style={{fontSize:11,color:"#475569",marginBottom:6,fontWeight:500}}>I am confident of my decision. (1 = not confident · 7 = very confident)</div>
         <div style={{display:"flex",gap:4,alignItems:"center"}}>
           <span style={{fontSize:10,color:"#bbb",minWidth:60}}>Not confident</span>
           {[1,2,3,4,5,6,7].map(n=>(<button key={n} onClick={()=>setConf(n)} style={{width:30,height:30,borderRadius:6,border:`1px solid ${conf===n?"#2980b9":"#ddd"}`,background:conf===n?"#e8f0fe":"#fff",color:conf===n?"#2980b9":"#888",fontSize:12,cursor:"pointer",fontWeight:conf===n?700:400}}>{n}</button>))}
@@ -620,14 +620,14 @@ function ExpRatingWidget({txId,expTab,saved,onSave}){
       ):(
         <>
           <ScaleRow
-            label="1. This explanation makes it easier to understand how the AI makes its decisions."
-            value={load}
-            setValue={setLoad}
-          />
-          <ScaleRow
-            label="2. This explanation increases my trust in the AI's assessment of whether a transaction is fraudulent."
+            label="1. With this explanation, I trust this AI in assessing whether the transaction is fraudulent."
             value={trust}
             setValue={setTrust}
+          />
+          <ScaleRow
+            label="2. This explanation reduced the mental load needed to understand the logic of the AI making the inputs."
+            value={load}
+            setValue={setLoad}
           />
           <div style={{display:"flex",alignItems:"center",gap:10,marginTop:4}}>
             <button onClick={()=>onSave(key,{trust,mental_load:load,exp:expTab,transaction_id:txId,tab_time_s:Math.round((Date.now()-tabStart)/1000)})}
@@ -647,13 +647,14 @@ function SummaryWidget({txId,initialClass,saved,onSave,txStart}){
   const key=`summary-${txId}`;
   const [reclassify,setReclassify]=useState(null);
   const [bestExp,setBestExp]=useState(null);
-  useEffect(()=>{setReclassify(null);setBestExp(null);},[txId]);
+  const [conf,setConf]=useState(null);
+  useEffect(()=>{setReclassify(null);setBestExp(null);setConf(null);},[txId]);
   if(saved[key])return(
     <div style={{padding:"12px 14px",background:"#f0fdf4",borderRadius:8,border:"1px solid #bbf7d0"}}>
       <div style={{fontSize:12,color:"#166534",fontWeight:600}}>✓ Summary evaluation recorded for this transaction</div>
     </div>
   );
-  const allDone=reclassify&&bestExp;
+  const allDone=reclassify&&bestExp&&conf;
   const tc=initialClass?TRUTH_CFG[initialClass]:null;
   return(
     <div style={{padding:"14px",background:"#f2eef9",borderRadius:8,border:"1px solid #ddd6fe"}}>
@@ -670,6 +671,14 @@ function SummaryWidget({txId,initialClass,saved,onSave,txStart}){
         </div>
       </div>
       <div style={{marginBottom:12}}>
+        <div style={{fontSize:11,fontWeight:500,color:"#374151",marginBottom:6}}>I am confident of my decision. (1 = not confident · 7 = very confident)</div>
+        <div style={{display:"flex",gap:4,alignItems:"center"}}>
+          <span style={{fontSize:10,color:"#bbb",minWidth:60}}>Not confident</span>
+          {[1,2,3,4,5,6,7].map(n=>(<button key={n} onClick={()=>setConf(n)} style={{width:30,height:30,borderRadius:6,border:`1px solid ${conf===n?"#7b5ea7":"#ddd"}`,background:conf===n?"#ede9fe":"#fff",color:conf===n?"#7b5ea7":"#888",fontSize:12,cursor:"pointer",fontWeight:conf===n?700:400}}>{n}</button>))}
+          <span style={{fontSize:10,color:"#bbb",minWidth:60}}>Very confident</span>
+        </div>
+      </div>
+      <div style={{marginBottom:12}}>
         <div style={{fontSize:11,fontWeight:500,color:"#374151",marginBottom:6}}>Which explanation type was most helpful for your decision?</div>
         <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
           {ALL_EXP_TABS.map(t=>(
@@ -677,7 +686,7 @@ function SummaryWidget({txId,initialClass,saved,onSave,txStart}){
           ))}
         </div>
       </div>
-      <button onClick={()=>onSave(key,{reclassification:reclassify,most_helpful_explanation:bestExp,transaction_id:txId,initial_classification:initialClass,total_txn_time_s:Math.round((Date.now()-txStart)/1000)})}
+      <button onClick={()=>onSave(key,{reclassification:reclassify,most_helpful_explanation:bestExp,final_confidence:conf,transaction_id:txId,initial_classification:initialClass,total_txn_time_s:Math.round((Date.now()-txStart)/1000)})}
         disabled={!allDone}
         style={{padding:"8px 20px",borderRadius:8,border:`1px solid ${allDone?"#7b5ea7":"#ccc"}`,background:allDone?"#7b5ea7":"#f5f5f5",color:allDone?"#fff":"#aaa",fontSize:12,cursor:allDone?"pointer":"default",fontWeight:600}}>
         Save &amp; complete this transaction →
