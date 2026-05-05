@@ -664,7 +664,7 @@ function SummaryWidget({txId,initialClass,saved,onSave,txStart}){
           ))}
         </div>
       </div>
-      <button onClick={()=>onSave(key,{reclassification:reclassify,most_helpful_explanation:bestExp,transaction_id:txId,initial_classification:initialClass})}
+      <button onClick={()=>onSave(key,{reclassification:reclassify,most_helpful_explanation:bestExp,transaction_id:txId,initial_classification:initialClass,total_txn_time_s:Math.round((Date.now()-txStart)/1000)})}
         disabled={!allDone}
         style={{padding:"8px 20px",borderRadius:8,border:`1px solid ${allDone?"#7b5ea7":"#ccc"}`,background:allDone?"#7b5ea7":"#f5f5f5",color:allDone?"#fff":"#aaa",fontSize:12,cursor:allDone?"pointer":"default",fontWeight:600}}>
         Save &amp; complete this transaction →
