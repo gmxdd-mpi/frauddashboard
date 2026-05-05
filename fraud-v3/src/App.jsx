@@ -1,10 +1,21 @@
 import { useState, useEffect } from "react";
 
 const ALL_TXN = [
-  { id:"3053108", amount:152.51, product:"C", network:"visa",       cardType:"credit", addr:null, dist:null, groundTruth:"confirmed_fraud" },
-  { id:"3354853", amount:25.95,  product:"W", network:"visa",       cardType:"debit",  addr:324,  dist:8,    groundTruth:"legitimate"      },
-  { id:"3492704", amount:230.18, product:"C", network:"visa",       cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" },
-  { id:"3557070", amount:29.00,  product:"W", network:"visa",       cardType:"debit",  addr:325,  dist:8,    groundTruth:"legitimate"      },
+  { id:"3053108", amount:152.51, product:"C", network:"visa", cardType:"credit", addr:null, dist:null, groundTruth:"confirmed_fraud" },
+  { id:"3354853", amount:25.95,  product:"W", network:"visa", cardType:"debit",  addr:324,  dist:8,    groundTruth:"legitimate"      },
+  { id:"3492704", amount:230.18, product:"C", network:"visa", cardType:"debit",  addr:null, dist:null, groundTruth:"confirmed_fraud" },
+  { id:"3557070", amount:29.00,  product:"W", network:"visa", cardType:"debit",  addr:325,  dist:8,    groundTruth:"legitimate"      },
+];
+
+const PEER_POOL = [
+  { id:"3041132", amount:44.00,  product:"W", network:"visa", cardType:"debit",  dist:null, groundTruth:"confirmed_fraud" },
+  { id:"3513937", amount:59.00,  product:"W", network:"visa", cardType:"debit",  dist:959,  groundTruth:"confirmed_fraud" },
+  { id:"3344148", amount:25.00,  product:"W", network:"visa", cardType:"debit",  dist:null, groundTruth:"confirmed_fraud" },
+  { id:"3482177", amount:39.47,  product:"C", network:"visa", cardType:"credit", dist:null, groundTruth:"confirmed_fraud" },
+  { id:"3139055", amount:66.46,  product:"C", network:"visa", cardType:"credit", dist:null, groundTruth:"confirmed_fraud" },
+  { id:"3018989", amount:57.95,  product:"W", network:"visa", cardType:"debit",  dist:4,    groundTruth:"legitimate"      },
+  { id:"3312150", amount:149.95, product:"W", network:"visa", cardType:"debit",  dist:15,   groundTruth:"legitimate"      },
+  { id:"3053086", amount:49.00,  product:"W", network:"visa", cardType:"debit",  dist:null, groundTruth:"legitimate"      },
 ];
 
 const REAL_EXPLANATIONS = {
@@ -359,11 +370,14 @@ function CounterfactualPanel({tx}){
 }
 
 function PeersPanel({tx}){
-  const others=ALL_TXN.filter(t=>t.id!==tx.id).map(t=>{
+  const others=PEER_POOL.map(p=>{
     let sim=0;
-    if(t.product===tx.product)sim+=25;if(t.network===tx.network)sim+=20;
-    if(t.cardType===tx.cardType)sim+=20;if(Math.abs(t.amount-tx.amount)<tx.amount*0.4)sim+=25;
-    if((t.dist===null)===(tx.dist===null))sim+=10;return{...t,sim};
+    if(p.product===tx.product)sim+=25;
+    if(p.network===tx.network)sim+=20;
+    if(p.cardType===tx.cardType)sim+=20;
+    if(Math.abs(p.amount-tx.amount)<tx.amount*0.4)sim+=25;
+    if((p.dist===null)===(tx.dist===null))sim+=10;
+    return{...p,sim};
   }).sort((a,b)=>b.sim-a.sim);
   const fraudCount=others.filter(p=>p.groundTruth==="confirmed_fraud").length;
   const [expanded,setExpanded]=useState(null);
