@@ -141,9 +141,6 @@ function annotateLimeRule(rule, tx){
   if(/dist1 <= -1/.test(rule)){
     return "Distance data is unavailable — the transaction location cannot be verified against the billing address, which is associated with higher fraud risk";
   }
-  if(/addr1 <= 184/.test(rule))           return "Billing region is in the lower range — the model weighted this when scoring the transaction";
-  if(/184\.00 < addr1 <= 272/.test(rule)) return "Billing region is in the mid range — the model weighted this when scoring the transaction";
-  if(/272\.00 < addr1 <= 327/.test(rule)) return "Billing region is in the higher range — the model weighted this when scoring the transaction";
   return null;
 }
 
