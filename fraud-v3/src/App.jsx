@@ -96,20 +96,54 @@ const CHANNEL_CONTEXT = {
 function annotateLimeRule(rule, tx){
   const network = tx.network.toLowerCase();
   const cardType = tx.cardType.toLowerCase();
-  const cardTypeRate = FRAUD_RATES.card6[cardType];
-  const networkRate = FRAUD_RATES.card4[network];
   const channelContext = CHANNEL_CONTEXT[tx.product] || `${CHANNEL_LABELS[tx.product]||tx.product} transactions were factored in by the model`;
-  if(/TransactionAmt > 125/.test(rule))           return "Amount is high — above the typical threshold for this channel";
-  if(/TransactionAmt <= 43/.test(rule))            return "Amount is low — well within the normal range for this channel";
-  if(/68\.77 < TransactionAmt <= 125/.test(rule))  return "Amount is moderate — within a common mid-range band";
-  if(/card6 <= 1/.test(rule))                      return `Card type is ${tx.cardType} — ${cardTypeRate}% of ${tx.cardType} card transactions in the training data were fraudulent`;
-  if(/card4 <= 2/.test(rule))                      return `Card network is ${tx.network} — ${networkRate}% of ${tx.network} transactions in the training data were fraudulent`;
-  if(/ProductCD <= 3/.test(rule))                  return channelContext;
-  if(/dist1 > 5/.test(rule))                       return `Distance is ${tx.dist}km — transaction occurred far from the billing address, increasing suspicion`;
-  if(/dist1 <= -1/.test(rule))                     return "Distance data unavailable — the transaction location cannot be verified against the billing address, which is associated with higher fraud risk";
-  if(/addr1 <= 184/.test(rule))                    return "Billing region is in the lower range — the model weighted this when scoring the transaction";
-  if(/184\.00 < addr1 <= 272/.test(rule))          return "Billing region is in the mid range — the model weighted this when scoring the transaction";
-  if(/272\.00 < addr1 <= 327/.test(rule))          return "Billing region is in the higher range — the model weighted this when scoring the transaction";
+
+  if(/TransactionAmt > 125/.test(rule)){
+    const applies = tx.amount > 125;
+    return applies
+      ? `Amount is ${tx.amount.toFixed(2)} — above the $125 threshold, which is associated with higher fraud risk`
+      : `Amount is ${tx.amount.toFixed(2)} — below the $125 threshold, which is associated with lower fraud risk`;
+  }
+  if(/TransactionAmt <= 43/.test(rule)){
+    const applies = tx.amount <= 43.32;
+    return applies
+      ? `Amount is ${tx.amount.toFixed(2)} — a small transaction, which is associated with lower fraud risk`
+      : `Amount is ${tx.amount.toFixed(2)} — above the low-amount threshold of $43`;
+  }
+  if(/68\.77 < TransactionAmt <= 125/.test(rule)){
+    const applies = tx.amount > 68.77 && tx.amount <= 125;
+    return applies
+      ? `Amount is ${tx.amount.toFixed(2)} — in the mid-range band ($68–$125)`
+      : `Amount is ${tx.amount.toFixed(2)} — outside the mid-range band ($68–$125)`;
+  }
+  if(/card6 <= 1/.test(rule)){
+    // card6 encoding: debit=0, credit=1 — both satisfy <= 1, so the meaningful signal
+    // is which type this transaction actually is
+    const rate = FRAUD_RATES.card6[cardType] ?? "unknown";
+    const otherType = cardType === "credit" ? "debit" : "credit";
+    const otherRate = FRAUD_RATES.card6[otherType] ?? "unknown";
+    return `Card type is ${cardType} (${rate}% fraud rate in training data). `
+      + `${cardType === "credit" ? "Credit cards have a higher fraud rate than" : "Debit cards have a lower fraud rate than"} `
+      + `${otherType} cards (${otherRate}%) — this ${cardType === "credit" ? "raises" : "lowers"} risk`;
+  }
+  if(/card4 <= 2/.test(rule)){
+    const rate = FRAUD_RATES.card4[network] ?? "unknown";
+    return `Card network is ${tx.network} — ${rate}% of ${tx.network} transactions in the training data were fraudulent`;
+  }
+  if(/ProductCD <= 3/.test(rule)){
+    return channelContext;
+  }
+  if(/dist1 > 5/.test(rule)){
+    return tx.dist !== null
+      ? `Distance is ${tx.dist}km — transaction occurred away from the billing address, which raises suspicion`
+      : `Distance data is unavailable — location could not be compared against the billing address`;
+  }
+  if(/dist1 <= -1/.test(rule)){
+    return "Distance data is unavailable — the transaction location cannot be verified against the billing address, which is associated with higher fraud risk";
+  }
+  if(/addr1 <= 184/.test(rule))           return "Billing region is in the lower range — the model weighted this when scoring the transaction";
+  if(/184\.00 < addr1 <= 272/.test(rule)) return "Billing region is in the mid range — the model weighted this when scoring the transaction";
+  if(/272\.00 < addr1 <= 327/.test(rule)) return "Billing region is in the higher range — the model weighted this when scoring the transaction";
   return null;
 }
 
