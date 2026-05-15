@@ -141,6 +141,9 @@ function annotateLimeRule(rule, tx){
   if(/dist1 <= -1/.test(rule)){
     return "Distance data is unavailable — the transaction location cannot be verified against the billing address, which is associated with higher fraud risk";
   }
+  if(/addr1 <= 184/.test(rule))           return "Billing region is in the lower range — the model weighted this when scoring the transaction";
+  if(/184\.00 < addr1 <= 272/.test(rule)) return "Billing region is in the mid range — the model weighted this when scoring the transaction";
+  if(/272\.00 < addr1 <= 327/.test(rule)) return "Billing region is in the higher range — the model weighted this when scoring the transaction";
   return null;
 }
 
@@ -168,7 +171,7 @@ function getRiskFlags(tx, score) {
   if (tx.dist !== null && tx.dist > 100)                     f.push({ code:"RF-03", label:"Suspicious transaction distance",                      severity:"HIGH" });
   if (tx.dist !== null && tx.dist > 20 && tx.dist <= 100)   f.push({ code:"RF-03", label:"Elevated transaction distance",                        severity:"MED"  });
   if (tx.product === "C" && score > 0.3)                    f.push({ code:"RF-05", label:"Card payment — elevated risk pattern",                 severity:"MED"  });
-  if (tx.product === "W" && tx.dist !== null && tx.dist > 5) f.push({ code:"RF-06", label:"Web purchase with distance anomaly",                  severity:"MED"  });
+  if (tx.product === "W" && tx.dist !== null && tx.dist > 50) f.push({ code:"RF-06", label:"Web purchase with distance anomaly",                  severity:"MED"  });
   if (score >= 0.4 && score < 0.7)                          f.push({ code:"RF-07", label:"Medium fraud score — review required",                 severity:"MED"  });
   if (f.length === 0)                                        f.push({ code:"RF-00", label:"No rules triggered — transaction within normal parameters", severity:"LOW" });
   return f;
