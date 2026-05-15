@@ -8,8 +8,6 @@ const ALL_TXN = [
 ];
 
 const PEER_POOLS = {
-  // False Negative — model missed fraud. Peers show similar transactions that WERE caught as fraud,
-  // nudging analysts to question why this one scored so low.
   "3053108": [
     { id:"3521091", amount:157.39, product:"C", network:"visa", cardType:"debit",  dist:null, groundTruth:"confirmed_fraud" },
     { id:"3314821", amount:134.13, product:"C", network:"visa", cardType:"debit",  dist:null, groundTruth:"confirmed_fraud" },
@@ -17,8 +15,6 @@ const PEER_POOLS = {
     { id:"3115753", amount:130.13, product:"C", network:"visa", cardType:"credit", dist:null, groundTruth:"confirmed_fraud" },
     { id:"3431490", amount:83.67,  product:"C", network:"visa", cardType:"credit", dist:null, groundTruth:"legitimate"      },
   ],
-  // False Positive — model wrongly flagged legit. Peers are mostly legit,
-  // helping analysts push back on the high score.
   "3354853": [
     { id:"3565025", amount:57.95,  product:"W", network:"visa", cardType:"debit",  dist:7,    groundTruth:"confirmed_fraud" },
     { id:"3211183", amount:58.95,  product:"W", network:"visa", cardType:"debit",  dist:8,    groundTruth:"legitimate"      },
@@ -26,8 +22,6 @@ const PEER_POOLS = {
     { id:"3510290", amount:39.00,  product:"W", network:"visa", cardType:"debit",  dist:1,    groundTruth:"legitimate"      },
     { id:"3044069", amount:59.00,  product:"W", network:"visa", cardType:"debit",  dist:19,   groundTruth:"legitimate"      },
   ],
-  // True Positive — correctly caught fraud. Peers are mostly fraud,
-  // confirming the analyst's suspicion.
   "3492704": [
     { id:"3521091", amount:157.39, product:"C", network:"visa", cardType:"debit",  dist:null, groundTruth:"confirmed_fraud" },
     { id:"3314821", amount:134.13, product:"C", network:"visa", cardType:"debit",  dist:null, groundTruth:"confirmed_fraud" },
@@ -35,8 +29,6 @@ const PEER_POOLS = {
     { id:"3074287", amount:54.10,  product:"C", network:"visa", cardType:"debit",  dist:null, groundTruth:"confirmed_fraud" },
     { id:"3202734", amount:40.97,  product:"C", network:"visa", cardType:"debit",  dist:null, groundTruth:"legitimate"      },
   ],
-  // True Negative — correctly cleared legit. Peers are mostly legit,
-  // confirming it is safe to approve.
   "3557070": [
     { id:"3211183", amount:58.95,  product:"W", network:"visa", cardType:"debit",  dist:8,    groundTruth:"legitimate"      },
     { id:"3223916", amount:47.95,  product:"W", network:"visa", cardType:"debit",  dist:2,    groundTruth:"legitimate"      },
@@ -93,7 +85,6 @@ const FRAUD_RATES = {
   ProductCD: { C: 11.7, H: 4.8, R: 3.8, S: 5.9, W: 2.0 },
 };
 
-// Contextual descriptions for channels
 const CHANNEL_CONTEXT = {
   C: "Card payments have the highest fraud rate in this dataset at 11.7% — nearly 6× higher than web purchases",
   W: "Web purchases have the lowest fraud rate in this dataset at 2.0% — a relatively low-risk channel",
@@ -103,21 +94,19 @@ const CHANNEL_CONTEXT = {
 };
 
 function annotateLimeRule(rule, tx){
-  const channel = CHANNEL_LABELS[tx.product] || tx.product;
   const network = tx.network.toLowerCase();
   const cardType = tx.cardType.toLowerCase();
   const cardTypeRate = FRAUD_RATES.card6[cardType];
   const networkRate = FRAUD_RATES.card4[network];
-  const channelContext = CHANNEL_CONTEXT[tx.product] || `${channel} transactions were factored in by the model`;
-
+  const channelContext = CHANNEL_CONTEXT[tx.product] || `${CHANNEL_LABELS[tx.product]||tx.product} transactions were factored in by the model`;
   if(/TransactionAmt > 125/.test(rule))           return "Amount is high — above the typical threshold for this channel";
   if(/TransactionAmt <= 43/.test(rule))            return "Amount is low — well within the normal range for this channel";
   if(/68\.77 < TransactionAmt <= 125/.test(rule))  return "Amount is moderate — within a common mid-range band";
   if(/card6 <= 1/.test(rule))                      return `Card type is ${tx.cardType} — ${cardTypeRate}% of ${tx.cardType} card transactions in the training data were fraudulent`;
   if(/card4 <= 2/.test(rule))                      return `Card network is ${tx.network} — ${networkRate}% of ${tx.network} transactions in the training data were fraudulent`;
   if(/ProductCD <= 3/.test(rule))                  return channelContext;
-  if(/dist1 > 5/.test(rule))                       return `Distance is ${tx.dist}km — the model factored in that distance data was present for this transaction`;
-  if(/dist1 <= -1/.test(rule))                     return "Distance data unavailable — transaction location could not be compared against the billing address";
+  if(/dist1 > 5/.test(rule))                       return `Distance is ${tx.dist}km — transaction occurred far from the billing address, increasing suspicion`;
+  if(/dist1 <= -1/.test(rule))                     return "Distance data unavailable — the transaction location cannot be verified against the billing address, which is associated with higher fraud risk";
   if(/addr1 <= 184/.test(rule))                    return "Billing region is in the lower range — the model weighted this when scoring the transaction";
   if(/184\.00 < addr1 <= 272/.test(rule))          return "Billing region is in the mid range — the model weighted this when scoring the transaction";
   if(/272\.00 < addr1 <= 327/.test(rule))          return "Billing region is in the higher range — the model weighted this when scoring the transaction";
@@ -140,16 +129,17 @@ function getLimeEntries(tx){
     .sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));
 }
 
-function getRiskFlags(tx,score){
-  const f=[];
-  if(score>=0.7)                               f.push({code:"RF-01",label:"High fraud score",severity:"HIGH"});
-  if(tx.amount>150)                            f.push({code:"RF-02",label:"Transaction amount above threshold",severity:"HIGH"});
-  if(tx.dist!==null&&tx.dist>100)              f.push({code:"RF-03",label:"Suspicious transaction distance",severity:"HIGH"});
-  if(tx.dist!==null&&tx.dist>20&&tx.dist<=100) f.push({code:"RF-03",label:"Elevated transaction distance",severity:"MED"});
-  if(tx.product==="C"&&score>0.3)              f.push({code:"RF-05",label:"Card payment — elevated risk pattern",severity:"MED"});
-  if(tx.product==="W"&&tx.dist!==null&&tx.dist>5) f.push({code:"RF-06",label:"Web purchase with distance anomaly",severity:"MED"});
-  if(score>=0.4&&score<0.7)                    f.push({code:"RF-07",label:"Medium fraud score — review required",severity:"MED"});
-  if(f.length===0)                             f.push({code:"RF-00",label:"No rules triggered — transaction within normal parameters",severity:"LOW"});
+function getRiskFlags(tx, score) {
+  const f = [];
+  if (score >= 0.7)                                          f.push({ code:"RF-01", label:"High fraud score",                                    severity:"HIGH" });
+  if (tx.amount > 150)                                       f.push({ code:"RF-02", label:"Transaction amount above threshold",                   severity:"HIGH" });
+  if (tx.dist === null)                                      f.push({ code:"RF-04", label:"Distance data unavailable — location unverifiable",    severity:"MED"  });
+  if (tx.dist !== null && tx.dist > 100)                     f.push({ code:"RF-03", label:"Suspicious transaction distance",                      severity:"HIGH" });
+  if (tx.dist !== null && tx.dist > 20 && tx.dist <= 100)   f.push({ code:"RF-03", label:"Elevated transaction distance",                        severity:"MED"  });
+  if (tx.product === "C" && score > 0.3)                    f.push({ code:"RF-05", label:"Card payment — elevated risk pattern",                 severity:"MED"  });
+  if (tx.product === "W" && tx.dist !== null && tx.dist > 5) f.push({ code:"RF-06", label:"Web purchase with distance anomaly",                  severity:"MED"  });
+  if (score >= 0.4 && score < 0.7)                          f.push({ code:"RF-07", label:"Medium fraud score — review required",                 severity:"MED"  });
+  if (f.length === 0)                                        f.push({ code:"RF-00", label:"No rules triggered — transaction within normal parameters", severity:"LOW" });
   return f;
 }
 
@@ -188,7 +178,7 @@ const SHAP_TOOLTIPS = {
   ProductCD: "The channel through which the transaction was made — e.g. web purchase or card payment. Some channels are more commonly associated with fraud.",
   card4: "The card network (e.g. Visa, Mastercard). Certain networks appear more frequently in fraudulent transactions in the training data.",
   card6: "Whether the card is a credit or debit card. The model learned that one type is more associated with fraud in this dataset.",
-  dist1: "The distance in km between the billing address and where the transaction occurred. Large distances can indicate the card is being used away from its owner.",
+  dist1: "The distance in km between the billing address and where the transaction occurred. Large distances can indicate the card is being used away from its owner. Missing distance data is also a risk signal — it means the transaction location could not be verified at all.",
 };
 
 function ShapTooltip({featureKey}){
@@ -362,7 +352,9 @@ function CounterfactualPanel({tx}){
     ProductCD:     {required:"Different transaction channel",feasible:false,reason:"Cannot be changed retroactively"},
     card4:         {required:"Verify card ownership with issuer",feasible:true,reason:"Analyst can contact card issuer"},
     card6:         {required:"Verify card type matches account",feasible:true,reason:"Analyst can check account records"},
-    dist1:         {required:"Cardholder confirms travel or foreign purchase",feasible:true,reason:"Analyst can contact cardholder"},
+    dist1: tx.dist === null
+      ? { required:"Obtain transaction location data and verify against billing address", feasible:true, reason:"Analyst can request location data from payment processor or contact cardholder" }
+      : { required:"Cardholder confirms travel or foreign purchase", feasible:true, reason:"Analyst can contact cardholder" },
   };
   if(!riskDrivers.length)return<div style={{fontSize:13,color:"#888",padding:"12px 0"}}>No risk-increasing features for this transaction.</div>;
   return(
@@ -619,16 +611,8 @@ function ExpRatingWidget({txId,expTab,saved,onSave}){
         </div>
       ):(
         <>
-          <ScaleRow
-            label="1. With this explanation, I trust this AI in assessing whether the transaction is fraudulent."
-            value={trust}
-            setValue={setTrust}
-          />
-          <ScaleRow
-            label="2. This explanation reduced the mental load needed to understand the logic of the AI making the inputs."
-            value={load}
-            setValue={setLoad}
-          />
+          <ScaleRow label="1. With this explanation, I trust this AI in assessing whether the transaction is fraudulent." value={trust} setValue={setTrust}/>
+          <ScaleRow label="2. This explanation reduced the mental load needed to understand the logic of the AI making the inputs." value={load} setValue={setLoad}/>
           <div style={{display:"flex",alignItems:"center",gap:10,marginTop:4}}>
             <button onClick={()=>onSave(key,{trust,mental_load:load,exp:expTab,transaction_id:txId,tab_time_s:Math.round((Date.now()-tabStart)/1000)})}
               disabled={!allDone}
