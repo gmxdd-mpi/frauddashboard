@@ -430,7 +430,7 @@ function ClassifyWidget({txId,saved,onSave}){
     </div>
   );
   return(
-    <div style={{padding:"12px",background:"#fafafa",borderRadius:12,border:"1px solid #e2e8f0",width:"100%",boxSizing:"border-box"}}>
+    <div style={{padding:"14px",background:"#fafafa",borderRadius:12,border:"1px solid #e2e8f0",width:"100%",boxSizing:"border-box"}}>
       <div style={{fontSize:12,fontWeight:600,color:"#1e293b",marginBottom:10}}>Step 1 — Initial classification</div>
       <div style={{fontSize:11,color:"#475569",marginBottom:6,fontWeight:500}}>How would you classify this transaction?</div>
       <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
