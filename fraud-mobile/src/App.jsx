@@ -615,10 +615,10 @@ export default function App(){
         </div>
       </div>
 
-      <div style={{padding:"12px 12px 80px"}}>
+      <div style={{padding:"12px 12px 80px",width:"100%",boxSizing:"border-box"}}>
 
         {/* Transaction summary card */}
-        <div style={{background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:"14px",marginBottom:10}}>
+        <div style={{background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:"14px",marginBottom:10,width:"100%",minWidth:0,boxSizing:"border-box",alignSelf:"stretch"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
             <div>
               <div style={{fontSize:10,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".08em"}}>Transaction ID</div>
