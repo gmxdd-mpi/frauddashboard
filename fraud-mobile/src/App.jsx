@@ -639,11 +639,11 @@ export default function App(){
             ))}
           </div>
           {/* Risk flags */}
-          <div style={{marginTop:10}}>
+          <div style={{marginTop:10,width:"100%",boxSizing:"border-box"}}>
             {flags.map((f,i)=>{
               const sc=SEV_CFG[f.severity];
               return(
-                <div key={i} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",background:sc.bg,borderRadius:5,border:`1px solid ${sc.col}22`,marginBottom:4}}>
+                <div key={i} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",background:sc.bg,borderRadius:5,border:`1px solid ${sc.col}22`,marginBottom:4,width:"100%",boxSizing:"border-box"}}>
                   <span style={{fontSize:9,fontFamily:"monospace",fontWeight:700,color:sc.col,minWidth:34}}>{f.code}</span>
                   <span style={{fontSize:11,color:"#1e293b",flex:1}}>{f.label}</span>
                   <span style={{fontSize:9,fontWeight:700,color:sc.col,padding:"1px 5px",borderRadius:6,background:"#fff",border:`1px solid ${sc.col}44`}}>{f.severity}</span>
