@@ -45,7 +45,7 @@ const REAL_EXPLANATIONS = {
   "3557070":{ score:0.015,  shap:{TransactionAmt:-2.1688,ProductCD:0.0755,card4:-0.2918,card6:0.0731,addr1:-0.3374,dist1:-1.5203}, lime:{"card6 <= 1.00":-0.1369,"TransactionAmt <= 43.32":-0.1098,"ProductCD <= 3.00":0.0983,"dist1 > 5.00":-0.0859,"272.00 < addr1 <= 327.00":0.0252,"card4 <= 2.00":-0.0128} },
 };
 
-const SHEET_URL = "https://script.google.com/macros/s/AKfycbx5A491nOuh2pIw5_rkhghLAkySf73Z_jk0QdYd4Mm-NEwYuiEoEzbrC-PxuzLkiu492w/exec";
+const SHEET_URL = "https://script.google.com/macros/s/AKfycbxzon2zq5pp-nOh3nnio__Vk8Dm8oVvbhAI1oVBc1xR7MsMT4A6RVSmun5b3gM0ObVV/exec";
 
 const FEAT_LABELS = {
   TransactionAmt:"Transaction amount (USD)",
@@ -424,13 +424,13 @@ function ClassifyWidget({txId,saved,onSave}){
   const [start]=useState(Date.now());
   useEffect(()=>{setCls(null);setConf(null);},[txId]);
   if(saved[key])return(
-    <div style={{padding:"10px 12px",background:"#f0fdf4",borderRadius:8,border:"1px solid #bbf7d0"}}>
+    <div style={{padding:"10px 12px",background:"#f0fdf4",borderRadius:8,border:"1px solid #bbf7d0",width:"100%",boxSizing:"border-box"}}>
       <div style={{fontSize:12,color:"#166534",fontWeight:600,marginBottom:2}}>✓ Classification recorded</div>
       <div style={{fontSize:11,color:"#166534"}}>{TRUTH_CFG[saved[key].classification]?.label} · Confidence {saved[key].confidence}/7</div>
     </div>
   );
   return(
-    <div style={{padding:"12px",background:"#fafafa",borderRadius:8,border:"1px solid #e8e8e8"}}>
+    <div style={{padding:"12px",background:"#fafafa",borderRadius:12,border:"1px solid #e2e8f0",width:"100%",boxSizing:"border-box"}}>
       <div style={{fontSize:12,fontWeight:600,color:"#1e293b",marginBottom:10}}>Step 1 — Initial classification</div>
       <div style={{fontSize:11,color:"#475569",marginBottom:6,fontWeight:500}}>How would you classify this transaction?</div>
       <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
@@ -553,8 +553,8 @@ export default function App(){
   const [selected,setSelected]=useState(0);
   const [saved,setSaved]=useState({});
   const participantId=useState(()=>`P-${Date.now().toString(36).toUpperCase()}`)[0];
-  const [txnOrder]=useState(()=>shuffle(ALL_TXN));
-  const [tabOrder]=useState(()=>shuffle(EXP_TAB_IDS));
+  const [txnOrder]=useState(()=>shuffle([...ALL_TXN]));
+  const [tabOrder]=useState(()=>shuffle([...EXP_TAB_IDS]));
   const [expTab,setExpTab]=useState(()=>tabOrder[0]);
   const [txStartTimes,setTxStartTimes]=useState({[0]:Date.now()});
   const [view,setView]=useState("txn"); // "txn" | "exp"
@@ -654,7 +654,9 @@ export default function App(){
         </div>
 
         {/* Step 1 */}
-        <ClassifyWidget txId={tx.id} saved={saved} onSave={handleSave}/>
+        <div style={{marginTop:10,width:"100%",boxSizing:"border-box"}}>
+          <ClassifyWidget txId={tx.id} saved={saved} onSave={handleSave}/>
+        </div>
 
         {/* Step 2 — Explanations */}
         {classified&&(
